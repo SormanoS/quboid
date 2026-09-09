@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  Package identity for the Microsoft Store.
+
+  Name, Publisher and PublisherDisplayName must match the values Partner
+  Center assigns once the "Cuboid" name is reserved: until then the values
+  below only identify local test builds. scripts\package-msix.ps1 rewrites
+  Version from the workspace manifest and can override identity, so nothing
+  here has to be edited by hand for a test package.
+
+  The application runs at full trust. A packaged full-trust desktop app is
+  not placed in an app container, so global hooks, RegisterHotKey and the
+  window manipulation Cuboid relies on behave as they do unpackaged, and
+  neither the registry nor %APPDATA% is virtualised.
+-->
+
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap5 rescap">
+
+  <Identity
+    Name="SormanoS.Cuboid"
+    Publisher="CN=Samuele Sormano"
+    Version="0.1.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Cuboid</DisplayName>
+    <PublisherDisplayName>Samuele Sormano</PublisherDisplayName>
+    <Logo>assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 10 22H2 is the oldest release Cuboid targets. -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.19045.0"
+      MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+    <Resource Language="it-it" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="Cuboid"
+      Executable="cuboid-app.exe"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="Cuboid"
+        Description="Move and resize windows with keyboard shortcuts and drag snapping."
+        BackgroundColor="transparent"
+        Square150x150Logo="assets\Square150x150Logo.png"
+        Square44x44Logo="assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!--
+          Launch at login for a packaged build. The HKCU Run key that
+          startup.rs writes is not the supported mechanism here: Windows
+          drives this task instead, and the user can disable it from Task
+          Manager. Enabled="false" leaves the choice to the app, which
+          toggles it through Windows.ApplicationModel.StartupTask.
+        -->
+        <uap5:Extension Category="windows.startupTask">
+          <uap5:StartupTask
+            TaskId="CuboidStartup"
+            Enabled="false"
+            DisplayName="Cuboid" />
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
