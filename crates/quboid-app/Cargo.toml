@@ -1,0 +1,31 @@
+[package]
+name = "quboid-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Quboid Base: window management for Windows"
+
+[lib]
+name = "quboid_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "quboid-app"
+path = "src/main.rs"
+
+[dependencies]
+crossbeam-channel.workspace = true
+quboid-core = { path = "../quboid-core" }
+quboid-ui = { path = "../quboid-ui" }
+quboid-windows = { path = "../quboid-windows" }
+eframe.workspace = true
+rfd.workspace = true
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+tray-icon.workspace = true
+windows.workspace = true
+
+[build-dependencies]
+embed-resource.workspace = true

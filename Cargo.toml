@@ -1,9 +1,9 @@
 [workspace]
 members = [
-    "crates/cuboid-app",
-    "crates/cuboid-core",
-    "crates/cuboid-ui",
-    "crates/cuboid-windows",
+    "crates/quboid-app",
+    "crates/quboid-core",
+    "crates/quboid-ui",
+    "crates/quboid-windows",
 ]
 resolver = "2"
 

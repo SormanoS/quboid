@@ -2,7 +2,7 @@
 /dist/
 /.idea/
 *.log
-crates/cuboid-app/cuboid.json
+crates/quboid-app/quboid.json
 
-# Compiled Win32 resource, produced by crates/cuboid-app/build.rs
-/crates/cuboid-app/cuboid.res
+# Compiled Win32 resource, produced by crates/quboid-app/build.rs
+/crates/quboid-app/quboid.res

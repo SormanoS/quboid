@@ -25,7 +25,7 @@ $Target = "x86_64-pc-windows-msvc"
 $Source = Join-Path $Root "packaging\msix"
 $Dist = Join-Path $Root "dist"
 $Layout = Join-Path $Dist "msix"
-$Executable = Join-Path $Root "target\$Target\release\cuboid-app.exe"
+$Executable = Join-Path $Root "target\$Target\release\quboid-app.exe"
 
 Push-Location $Root
 try {
@@ -92,7 +92,7 @@ try {
         throw "Windows SDK makeappx.exe was not found."
     }
 
-    $Package = Join-Path $Dist "Cuboid-$Version-windows-x64.msix"
+    $Package = Join-Path $Dist "Quboid-$Version-windows-x64.msix"
     if (Test-Path -LiteralPath $Package) {
         Remove-Item -LiteralPath $Package -Force
     }
