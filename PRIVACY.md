@@ -7,9 +7,10 @@ Quboid collects no personal information, and it transmits nothing anywhere.
 ## No data is collected or shared
 
 Quboid contains no telemetry, no analytics, no advertising, no crash
-reporting and no update checks. It sends nothing to the author or to any
-third party, because it cannot: the program has no networking code and links
-no networking library, so it is unable to open a network connection at all.
+reporting and no update checks. It sends nothing to the author, Samuele
+Sormano, or to any third party, because it cannot: the program has no
+networking code and links no networking library, so it is unable to open a
+network connection at all.
 
 ## What Quboid stores on your device
 
@@ -54,5 +55,5 @@ updated.
 
 ## Contact
 
-Questions about this policy can be raised at
-<https://github.com/SormanoS/quboid/issues>.
+This policy is published by Samuele Sormano, the author of Quboid. Questions
+about it can be raised at <https://github.com/SormanoS/quboid/issues>.
