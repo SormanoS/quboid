@@ -27,6 +27,23 @@ $Dist = Join-Path $Root "dist"
 $Layout = Join-Path $Dist "msix"
 $Executable = Join-Path $Root "target\$Target\release\quboid-app.exe"
 
+function Find-SdkTool {
+    param([string]$Name)
+
+    $tool = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+        -Recurse `
+        -File `
+        -Filter $Name `
+        -ErrorAction SilentlyContinue |
+        Where-Object { $_.DirectoryName -like "*\x64" } |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+    if (-not $tool) {
+        throw "Windows SDK $Name was not found."
+    }
+    return $tool.FullName
+}
+
 Push-Location $Root
 try {
     if (-not $Version) {
@@ -73,6 +90,34 @@ try {
     }
     $Appx.Save((Join-Path $Layout "AppxManifest.xml"))
 
+    # The logos ship as scale- and targetsize-qualified files, and only a
+    # resource index tells Windows which one to use; without it the manifest
+    # would name assets that exist under no literal path.
+    $MakePri = Find-SdkTool "makepri.exe"
+    $PriConfig = Join-Path $Dist "priconfig.xml"
+    if (Test-Path -LiteralPath $PriConfig) {
+        Remove-Item -LiteralPath $PriConfig -Force
+    }
+    & $MakePri createconfig /cf $PriConfig /dq "en-US_it-IT" /o | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "makepri createconfig failed."
+    }
+
+    # By default makepri splits scale and language variants into separate
+    # resource packages, which only a bundle loads. This is a single package,
+    # so the split would leave the high-DPI logos unreachable.
+    [xml]$PriSettings = Get-Content -LiteralPath $PriConfig
+    $Packaging = $PriSettings.resources.packaging
+    if ($Packaging) {
+        [void]$PriSettings.resources.RemoveChild($Packaging)
+        $PriSettings.Save($PriConfig)
+    }
+
+    & $MakePri new /pr $Layout /cf $PriConfig /of (Join-Path $Layout "resources.pri") /o | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "makepri new failed."
+    }
+
     if ($Register) {
         # Developer mode has to be on; this is a sideload of loose files.
         Add-AppxPackage -Register (Join-Path $Layout "AppxManifest.xml")
@@ -80,23 +125,13 @@ try {
         return
     }
 
-    $MakeAppx = Get-ChildItem -LiteralPath "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
-        -Recurse `
-        -File `
-        -Filter "makeappx.exe" `
-        -ErrorAction SilentlyContinue |
-        Where-Object { $_.DirectoryName -like "*\x64" } |
-        Sort-Object FullName -Descending |
-        Select-Object -First 1
-    if (-not $MakeAppx) {
-        throw "Windows SDK makeappx.exe was not found."
-    }
+    $MakeAppx = Find-SdkTool "makeappx.exe"
 
     $Package = Join-Path $Dist "Quboid-$Version-windows-x64.msix"
     if (Test-Path -LiteralPath $Package) {
         Remove-Item -LiteralPath $Package -Force
     }
-    & $MakeAppx.FullName pack /o /d $Layout /p $Package
+    & $MakeAppx pack /o /d $Layout /p $Package
     if ($LASTEXITCODE -ne 0) {
         throw "MSIX packaging failed."
     }
