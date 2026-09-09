@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: >-
+          Run the Windows end-to-end test. It drives real windows through
+          global hooks and needs an interactive desktop, so it is unreliable
+          on hosted runners and never blocks a pull request.
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Format, lint and test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: debug
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      # runtime_windows.rs drives real Win32 windows and hooks, so its cases
+      # are serialised. Running the suite single-threaded keeps them honest.
+      - name: Test
+        run: cargo test --workspace --locked -- --test-threads=1
+
+  package:
+    name: Build and package
+    runs-on: windows-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+
+      - name: Install the WiX CLI
+        run: |
+          dotnet tool install --global wix
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: Read the workspace version
+        id: version
+        run: |
+          $Manifest = Get-Content Cargo.toml -Raw
+          if ($Manifest -notmatch '(?m)^version = "(?<version>[^"]+)"') {
+              throw "No version found under [workspace.package] in Cargo.toml."
+          }
+          "version=$($Matches.version)" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+
+      - name: Build the release executable
+        run: cargo build --locked --release --target x86_64-pc-windows-msvc
+
+      - name: Package
+        run: .\scripts\package.ps1 -Version ${{ steps.version.outputs.version }} -SkipBuild
+
+      # -InstallSmoke is left to the release workflow: it installs and removes
+      # the MSI for real, which is slower and pointless on every pull request.
+      - name: Verify the artifacts
+        run: .\scripts\test-packaging.ps1 -Version ${{ steps.version.outputs.version }}
+
+      - name: Upload the artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuboid-${{ steps.version.outputs.version }}-windows-x64
+          if-no-files-found: error
+          path: |
+            dist/*.msi
+            dist/*.zip
+            dist/SHA256SUMS.txt
+
+  e2e:
+    name: Windows end-to-end
+    runs-on: windows-latest
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && inputs.run_e2e
+    # Hosted runners have no interactive desktop, so a failure here reports a
+    # limitation of the runner rather than a defect in Cuboid.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+
+      - name: Build the release executable
+        run: cargo build --locked --release --target x86_64-pc-windows-msvc
+
+      - name: Run the end-to-end test
+        run: .\scripts\test-windows-e2e.ps1
