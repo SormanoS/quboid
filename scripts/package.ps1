@@ -87,7 +87,20 @@ try {
     if (-not (Test-Path -LiteralPath $Wix)) {
         throw "WiX CLI was not found. Install WiX Toolset v4 or later."
     }
+
+    # WiX v7 refuses to build until its Open Source Maintenance Fee EULA is
+    # accepted, and earlier versions reject the switch that accepts it.
+    $WixArguments = @()
+    $WixVersion = (& $Wix --version) -join ""
+    if ($LASTEXITCODE -ne 0) {
+        throw "WiX CLI at $Wix did not report a version."
+    }
+    if ([int]($WixVersion -replace "^(\d+).*", '$1') -ge 7) {
+        $WixArguments += @("-acceptEula", "wix7")
+    }
+
     & $Wix build "packaging\wix\Cuboid.wxs" `
+        @WixArguments `
         -arch x64 `
         -d "SourceDir=$Stage" `
         -d "Version=$Version" `
