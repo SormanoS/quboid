@@ -4,7 +4,8 @@
 param(
     [string]$AssetDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) "packaging\msix\assets"),
     [string]$IconPath = (Join-Path (Split-Path -Parent $PSScriptRoot) "crates\quboid-app\quboid.ico"),
-    [string]$PreviewPath = ""
+    [string]$PreviewPath = "",
+    [string]$StoreLogoDirectory = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -111,6 +112,60 @@ function Save-Icon {
     $bitmap = New-IconBitmap -Size $Size -Width $Width -Plated $Plated -UnplatedColor $UnplatedColor
     $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
     $bitmap.Dispose()
+}
+
+if ($StoreLogoDirectory) {
+    # Artwork for the Store listing. These are upload artefacts rather than
+    # build inputs, so they are written wherever the caller asks and nothing is
+    # checked in. Drawing them here keeps them from drifting from the app icon.
+    if (-not (Test-Path -LiteralPath $StoreLogoDirectory)) {
+        New-Item -ItemType Directory -Path $StoreLogoDirectory -Force | Out-Null
+    }
+
+    # The tile icons Windows 10/11 customers see. Transparent, like the icon.
+    foreach ($size in 300, 150, 71) {
+        Save-Icon -Size $size -Width 0 -Plated $true -UnplatedColor $Light `
+            -Path (Join-Path $StoreLogoDirectory "StoreTile-${size}x${size}.png")
+    }
+
+    <#
+        Poster and box art are full-bleed images, so they need a background of
+        their own. The mark sits in the middle of the top two thirds because
+        the Store may lay text over the bottom third.
+    #>
+    function Save-PromoArt {
+        param([int]$Width, [int]$Height, [string]$Path)
+
+        $bitmap = New-Object Drawing.Bitmap $Width, $Height
+        $g = [Drawing.Graphics]::FromImage($bitmap)
+        $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $background = New-Object Drawing.Drawing2D.LinearGradientBrush(
+            (New-Object Drawing.RectangleF 0, 0, $Width, $Height),
+            [Drawing.Color]::White, $Light, 60.0)
+        $g.FillRectangle($background, 0, 0, $Width, $Height)
+        $background.Dispose()
+
+        $mark = [int]([Math]::Min($Width, $Height) * 0.55)
+        $source = New-IconBitmap -Size $mark
+        $x = [int](($Width - $mark) / 2)
+        $y = [int]($Height * 2.0 / 3.0 / 2.0 - $mark / 2)
+        $g.DrawImage($source, $x, $y, $mark, $mark)
+        $source.Dispose()
+        $g.Dispose()
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+        $bitmap.Dispose()
+    }
+
+    # Partner Center labels the poster art 9:16, but the sizes it accepts are
+    # 2:3. The sizes are what matter.
+    Save-PromoArt -Width 1440 -Height 2160 -Path (Join-Path $StoreLogoDirectory "PosterArt-1440x2160.png")
+    Save-PromoArt -Width 2160 -Height 2160 -Path (Join-Path $StoreLogoDirectory "BoxArt-2160x2160.png")
+    Save-PromoArt -Width 1920 -Height 1080 -Path (Join-Path $StoreLogoDirectory "Promotional-1920x1080.png")
+
+    Get-ChildItem -LiteralPath $StoreLogoDirectory -Filter *.png |
+        ForEach-Object { Write-Output "Wrote $($_.Name)" }
+    return
 }
 
 if ($PreviewPath) {
