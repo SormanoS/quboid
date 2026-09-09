@@ -9,10 +9,10 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 if (-not $ExecutablePath) {
-    $ExecutablePath = Join-Path $Root "target\x86_64-pc-windows-msvc\release\cuboid-app.exe"
+    $ExecutablePath = Join-Path $Root "target\x86_64-pc-windows-msvc\release\quboid-app.exe"
 }
 if (-not (Test-Path -LiteralPath $ExecutablePath)) {
-    throw "Cuboid executable not found: $ExecutablePath"
+    throw "Quboid executable not found: $ExecutablePath"
 }
 $ExecutablePath = (Resolve-Path -LiteralPath $ExecutablePath).Path
 
@@ -35,28 +35,28 @@ else {
     $null
 }
 $LogExisted = Test-Path -LiteralPath $LocalLog
-$InstalledConfig = Join-Path $env:APPDATA "Cuboid\config.json"
+$InstalledConfig = Join-Path $env:APPDATA "Quboid\config.json"
 $InstalledConfigHash = if (Test-Path -LiteralPath $InstalledConfig) {
     (Get-FileHash -Algorithm SHA256 -LiteralPath $InstalledConfig).Hash
 }
 else {
     ""
 }
-$Cuboid = $null
+$Quboid = $null
 $Form = $null
 
 function Get-VisibleRect {
     param([IntPtr]$Window)
 
-    $Rect = New-Object CuboidE2E+RECT
-    $Result = [CuboidE2E]::DwmGetWindowAttribute(
+    $Rect = New-Object QuboidE2E+RECT
+    $Result = [QuboidE2E]::DwmGetWindowAttribute(
         $Window,
         9,
         [ref]$Rect,
-        [Runtime.InteropServices.Marshal]::SizeOf([type][CuboidE2E+RECT])
+        [Runtime.InteropServices.Marshal]::SizeOf([type][QuboidE2E+RECT])
     )
     if ($Result -lt 0) {
-        if (-not [CuboidE2E]::GetWindowRect($Window, [ref]$Rect)) {
+        if (-not [QuboidE2E]::GetWindowRect($Window, [ref]$Rect)) {
             throw "GetWindowRect failed."
         }
     }
@@ -66,36 +66,36 @@ function Get-VisibleRect {
 function Get-WorkArea {
     param([IntPtr]$Window)
 
-    $Monitor = [CuboidE2E]::MonitorFromWindow($Window, 2)
-    $Info = New-Object CuboidE2E+MONITORINFO
-    $Info.cbSize = [Runtime.InteropServices.Marshal]::SizeOf([type][CuboidE2E+MONITORINFO])
-    if (-not [CuboidE2E]::GetMonitorInfo($Monitor, [ref]$Info)) {
+    $Monitor = [QuboidE2E]::MonitorFromWindow($Window, 2)
+    $Info = New-Object QuboidE2E+MONITORINFO
+    $Info.cbSize = [Runtime.InteropServices.Marshal]::SizeOf([type][QuboidE2E+MONITORINFO])
+    if (-not [QuboidE2E]::GetMonitorInfo($Monitor, [ref]$Info)) {
         throw "GetMonitorInfo failed."
     }
     return $Info.rcWork
 }
 
-function Send-CuboidHotkey {
+function Send-QuboidHotkey {
     param([byte]$Key)
 
-    [CuboidE2E]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
-    [CuboidE2E]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
-    [CuboidE2E]::keybd_event($Key, 0, 0, [UIntPtr]::Zero)
-    [CuboidE2E]::keybd_event($Key, 0, 2, [UIntPtr]::Zero)
-    [CuboidE2E]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
-    [CuboidE2E]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
+    [QuboidE2E]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
+    [QuboidE2E]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
+    [QuboidE2E]::keybd_event($Key, 0, 0, [UIntPtr]::Zero)
+    [QuboidE2E]::keybd_event($Key, 0, 2, [UIntPtr]::Zero)
+    [QuboidE2E]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+    [QuboidE2E]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
 }
 
 function Set-TestWindowForeground {
     $Deadline = [DateTime]::UtcNow.AddSeconds(3)
     do {
-        [CuboidE2E]::ForceForeground($Form.MainWindowHandle) | Out-Null
+        [QuboidE2E]::ForceForeground($Form.MainWindowHandle) | Out-Null
         Start-Sleep -Milliseconds 100
     } while (
-        [CuboidE2E]::GetForegroundWindow() -ne $Form.MainWindowHandle -and
+        [QuboidE2E]::GetForegroundWindow() -ne $Form.MainWindowHandle -and
         [DateTime]::UtcNow -lt $Deadline
     )
-    if ([CuboidE2E]::GetForegroundWindow() -ne $Form.MainWindowHandle) {
+    if ([QuboidE2E]::GetForegroundWindow() -ne $Form.MainWindowHandle) {
         throw "Synthetic test window could not receive foreground focus."
     }
 }
@@ -144,7 +144,7 @@ try {
     Add-Type @'
 using System;
 using System.Runtime.InteropServices;
-public static class CuboidE2E {
+public static class QuboidE2E {
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int Left, Top, Right, Bottom; }
 
@@ -215,12 +215,12 @@ public static class CuboidE2E {
     }
 }
 '@
-    $PreviousDpiContext = [CuboidE2E]::SetThreadDpiAwarenessContext([IntPtr](-4))
+    $PreviousDpiContext = [QuboidE2E]::SetThreadDpiAwarenessContext([IntPtr](-4))
 
     $FormCommand = @'
 Add-Type -AssemblyName System.Windows.Forms
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Cuboid E2E Test Window"
+$form.Text = "Quboid E2E Test Window"
 $form.Width = 800
 $form.Height = 500
 $form.StartPosition = "CenterScreen"
@@ -230,11 +230,11 @@ $form.StartPosition = "CenterScreen"
     $Form = Start-Process -FilePath "powershell.exe" `
         -ArgumentList @("-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", $Encoded) `
         -PassThru
-    $Cuboid = Start-Process -FilePath $ExecutablePath -PassThru
+    $Quboid = Start-Process -FilePath $ExecutablePath -PassThru
     Start-Sleep -Seconds 1
-    $Cuboid.Refresh()
-    if ($Cuboid.HasExited) {
-        throw "Cuboid exited before the end-to-end test (exit code $($Cuboid.ExitCode))."
+    $Quboid.Refresh()
+    if ($Quboid.HasExited) {
+        throw "Quboid exited before the end-to-end test (exit code $($Quboid.ExitCode))."
     }
 
     $Deadline = [DateTime]::UtcNow.AddSeconds(10)
@@ -252,7 +252,7 @@ $form.StartPosition = "CenterScreen"
     $Work = Get-WorkArea $Form.MainWindowHandle
     $ExpectedMiddle = $Work.Left + [int](($Work.Right - $Work.Left) / 2)
 
-    Send-CuboidHotkey 0x25
+    Send-QuboidHotkey 0x25
     Start-Sleep -Milliseconds 500
     $Snapped = Get-VisibleRect $Form.MainWindowHandle
     Assert-Near $Snapped.Left $Work.Left "hotkey left"
@@ -261,7 +261,7 @@ $form.StartPosition = "CenterScreen"
     Assert-Near $Snapped.Bottom $Work.Bottom "hotkey bottom"
 
     Set-TestWindowForeground
-    Send-CuboidHotkey 0x25
+    Send-QuboidHotkey 0x25
     Start-Sleep -Milliseconds 500
     $Repeated = Get-VisibleRect $Form.MainWindowHandle
     Assert-Near $Repeated.Left $Work.Left "repeat left"
@@ -270,7 +270,7 @@ $form.StartPosition = "CenterScreen"
     Assert-Near $Repeated.Bottom $Work.Bottom "repeat bottom"
 
     Set-TestWindowForeground
-    Send-CuboidHotkey 0x28
+    Send-QuboidHotkey 0x28
     Start-Sleep -Milliseconds 500
     $Restored = Get-VisibleRect $Form.MainWindowHandle
     Assert-Near $Restored.Left $Original.Left "restore left"
@@ -281,7 +281,7 @@ $form.StartPosition = "CenterScreen"
     Add-Type -AssemblyName System.Windows.Forms
     if ([System.Windows.Forms.Screen]::AllScreens.Count -gt 1) {
         Set-TestWindowForeground
-        Send-CuboidHotkey 0x4E
+        Send-QuboidHotkey 0x4E
         Start-Sleep -Milliseconds 700
         $NextMonitorWork = Get-WorkArea $Form.MainWindowHandle
         if (
@@ -293,7 +293,7 @@ $form.StartPosition = "CenterScreen"
             throw "Next-monitor hotkey did not move the test window to another monitor."
         }
         Set-TestWindowForeground
-        Send-CuboidHotkey 0x50
+        Send-QuboidHotkey 0x50
         Start-Sleep -Milliseconds 700
         $PreviousMonitorWork = Get-WorkArea $Form.MainWindowHandle
         if (
@@ -305,7 +305,7 @@ $form.StartPosition = "CenterScreen"
             throw "Previous-monitor hotkey did not return the test window."
         }
         Set-TestWindowForeground
-        Send-CuboidHotkey 0x28
+        Send-QuboidHotkey 0x28
         Start-Sleep -Milliseconds 500
         $Restored = Get-VisibleRect $Form.MainWindowHandle
     }
@@ -314,14 +314,14 @@ $form.StartPosition = "CenterScreen"
         Set-TestWindowForeground
         $StartX = [int](($Restored.Left + $Restored.Right) / 2)
         $StartY = $Restored.Top + 15
-        [CuboidE2E]::SetCursorPos($StartX, $StartY) | Out-Null
-        [CuboidE2E]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+        [QuboidE2E]::SetCursorPos($StartX, $StartY) | Out-Null
+        [QuboidE2E]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
         for ($Step = 1; $Step -le 20; $Step++) {
             $X = [int]($StartX + (($Work.Left + 1) - $StartX) * $Step / 20)
-            [CuboidE2E]::SetCursorPos($X, $StartY + 100) | Out-Null
+            [QuboidE2E]::SetCursorPos($X, $StartY + 100) | Out-Null
             Start-Sleep -Milliseconds 30
         }
-        [CuboidE2E]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+        [QuboidE2E]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
         Start-Sleep -Milliseconds 700
         $Dragged = Get-VisibleRect $Form.MainWindowHandle
         Assert-Near $Dragged.Left $Work.Left "drag left"
@@ -336,11 +336,11 @@ $form.StartPosition = "CenterScreen"
 }
 finally {
     if ($PreviousDpiContext -and $PreviousDpiContext -ne [IntPtr]::Zero) {
-        [CuboidE2E]::SetThreadDpiAwarenessContext($PreviousDpiContext) | Out-Null
+        [QuboidE2E]::SetThreadDpiAwarenessContext($PreviousDpiContext) | Out-Null
     }
-    if ($Cuboid -and -not $Cuboid.HasExited) {
-        Stop-Process -Id $Cuboid.Id
-        $Cuboid.WaitForExit()
+    if ($Quboid -and -not $Quboid.HasExited) {
+        Stop-Process -Id $Quboid.Id
+        $Quboid.WaitForExit()
     }
     if ($Form -and -not $Form.HasExited) {
         Stop-Process -Id $Form.Id
@@ -373,4 +373,4 @@ if ($CurrentInstalledHash -ne $InstalledConfigHash) {
     throw "Portable mode changed the installed AppData configuration."
 }
 
-Write-Output "Cuboid Windows end-to-end tests passed."
+Write-Output "Quboid Windows end-to-end tests passed."

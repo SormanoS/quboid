@@ -38,4 +38,4 @@ finally {
     Pop-Location
 }
 
-Write-Output "All Cuboid tests passed."
+Write-Output "All Quboid tests passed."
