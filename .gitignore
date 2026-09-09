@@ -1,0 +1,8 @@
+/target/
+/dist/
+/.idea/
+*.log
+crates/cuboid-app/cuboid.json
+
+# Compiled Win32 resource, produced by crates/cuboid-app/build.rs
+/crates/cuboid-app/cuboid.res
