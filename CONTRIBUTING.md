@@ -1,4 +1,4 @@
-# Contributing to Cuboid
+# Contributing to Quboid
 
 Thank you for considering a contribution. This document explains the licensing
 terms that contributions are accepted under. Please read it before opening a
@@ -6,7 +6,7 @@ pull request.
 
 ## Licensing of contributions
 
-Cuboid is released under the GNU General Public License, version 3, and the
+Quboid is released under the GNU General Public License, version 3, and the
 author also offers it under separate commercial terms. Keeping both options open
 requires that the author holds the rights to every line in this repository, so
 contributions are accepted under the agreement below.
@@ -46,7 +46,7 @@ version that contains it.
 
 ## Why this arrangement
 
-Cuboid is free software and is meant to stay that way. The additional grant
+Quboid is free software and is meant to stay that way. The additional grant
 exists so the author can offer commercial licences and build paid extensions on
 top of the same code. Without it, a single contribution would make that
 impossible for the whole project.

@@ -17,7 +17,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Target = "x86_64-pc-windows-msvc"
 $Dist = Join-Path $Root "dist"
 $Stage = Join-Path $Dist "stage"
-$Executable = Join-Path $Root "target\$Target\release\cuboid-app.exe"
+$Executable = Join-Path $Root "target\$Target\release\quboid-app.exe"
 
 Push-Location $Root
 try {
@@ -38,7 +38,7 @@ try {
     if (-not $Mt) {
         throw "Windows SDK mt.exe was not found."
     }
-    $EmbeddedManifest = Join-Path $env:TEMP "cuboid-package-manifest-$PID.xml"
+    $EmbeddedManifest = Join-Path $env:TEMP "quboid-package-manifest-$PID.xml"
     try {
         & $Mt.FullName -nologo "-inputresource:$Executable;#1" "-out:$EmbeddedManifest"
         if ($LASTEXITCODE -ne 0) {
@@ -65,13 +65,13 @@ try {
     New-Item -ItemType File -Path (Join-Path $Stage "portable.flag") -Force | Out-Null
 
     New-Item -ItemType Directory -Path $Dist -Force | Out-Null
-    $Zip = Join-Path $Dist "Cuboid-$Version-windows-x64-portable.zip"
+    $Zip = Join-Path $Dist "Quboid-$Version-windows-x64-portable.zip"
     if (Test-Path -LiteralPath $Zip) {
         Remove-Item -LiteralPath $Zip -Force
     }
     Compress-Archive -Path (Join-Path $Stage "*") -DestinationPath $Zip
 
-    $Msi = Join-Path $Dist "Cuboid-$Version-windows-x64.msi"
+    $Msi = Join-Path $Dist "Quboid-$Version-windows-x64.msi"
     if ($WixPath) {
         $Wix = $WixPath
     }
@@ -99,7 +99,7 @@ try {
         $WixArguments += @("-acceptEula", "wix7")
     }
 
-    & $Wix build "packaging\wix\Cuboid.wxs" `
+    & $Wix build "packaging\wix\Quboid.wxs" `
         @WixArguments `
         -arch x64 `
         -d "SourceDir=$Stage" `

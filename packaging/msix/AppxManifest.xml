@@ -4,14 +4,14 @@
   Package identity for the Microsoft Store.
 
   Name, Publisher and PublisherDisplayName must match the values Partner
-  Center assigns once the "Cuboid" name is reserved: until then the values
+  Center assigns once the "Quboid" name is reserved: until then the values
   below only identify local test builds. scripts\package-msix.ps1 rewrites
   Version from the workspace manifest and can override identity, so nothing
   here has to be edited by hand for a test package.
 
   The application runs at full trust. A packaged full-trust desktop app is
   not placed in an app container, so global hooks, RegisterHotKey and the
-  window manipulation Cuboid relies on behave as they do unpackaged, and
+  window manipulation Quboid relies on behave as they do unpackaged, and
   neither the registry nor %APPDATA% is virtualised.
 -->
 
@@ -23,19 +23,19 @@
   IgnorableNamespaces="uap uap5 rescap">
 
   <Identity
-    Name="SormanoS.Cuboid"
+    Name="SormanoS.Quboid"
     Publisher="CN=Samuele Sormano"
     Version="0.1.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>Cuboid</DisplayName>
+    <DisplayName>Quboid</DisplayName>
     <PublisherDisplayName>Samuele Sormano</PublisherDisplayName>
     <Logo>assets\StoreLogo.png</Logo>
   </Properties>
 
   <Dependencies>
-    <!-- Windows 10 22H2 is the oldest release Cuboid targets. -->
+    <!-- Windows 10 22H2 is the oldest release Quboid targets. -->
     <TargetDeviceFamily
       Name="Windows.Desktop"
       MinVersion="10.0.19045.0"
@@ -49,12 +49,12 @@
 
   <Applications>
     <Application
-      Id="Cuboid"
-      Executable="cuboid-app.exe"
+      Id="Quboid"
+      Executable="quboid-app.exe"
       EntryPoint="Windows.FullTrustApplication">
 
       <uap:VisualElements
-        DisplayName="Cuboid"
+        DisplayName="Quboid"
         Description="Move and resize windows with keyboard shortcuts and drag snapping."
         BackgroundColor="transparent"
         Square150x150Logo="assets\Square150x150Logo.png"
@@ -72,9 +72,9 @@
         -->
         <uap5:Extension Category="windows.startupTask">
           <uap5:StartupTask
-            TaskId="CuboidStartup"
+            TaskId="QuboidStartup"
             Enabled="false"
-            DisplayName="Cuboid" />
+            DisplayName="Quboid" />
         </uap5:Extension>
       </Extensions>
     </Application>
