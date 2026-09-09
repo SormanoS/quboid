@@ -92,13 +92,13 @@ that section and reporting everything stored beside it as discarded.
 | Rust, stable MSVC toolchain | Everything. `rust-toolchain.toml` pins the channel and the `x86_64-pc-windows-msvc` target | [rustup](https://rustup.rs) |
 | Visual Studio Build Tools with the C++ workload | The MSVC linker that Rust invokes | Visual Studio Installer, "Desktop development with C++" |
 | Windows SDK | `mt.exe`, which packaging uses to verify the manifest embedded in the executable, and `rc.exe` if the manifest changes | Included in the workload above |
-| WiX Toolset v4, v5 or v6 | The `.msi` | `dotnet tool install --global wix --version 4.*` |
+| WiX Toolset v4 or later | The `.msi` | `dotnet tool install --global wix` |
 | A code-signing certificate and `signtool.exe` | Signed releases. Optional: unsigned artifacts build fine, but Windows SmartScreen warns about them | Your certificate authority |
 
-WiX v7 refuses to build until its Open Source Maintenance Fee licence is
-accepted (`error WIX7015`). Either accept it, following the instructions the
-error links to, or keep an earlier WiX and point the packaging script at it with
-`-WixPath`, which is what the command below does when `wix.exe` on `PATH` is v7.
+WiX v7 refuses to build until its [Open Source Maintenance Fee](https://wixtoolset.org/osmf/)
+licence is accepted (`error WIX7015`). `scripts\package.ps1` accepts it for you
+when the WiX CLI it uses is v7 or later, so read that licence before packaging:
+it asks organizations above a revenue threshold to sponsor the toolset.
 
 ### The executable
 
@@ -141,7 +141,7 @@ the debug symbols of the installer and is not part of a release.
 # Package what is already built, without compiling again.
 .\scripts\package.ps1 -Version 0.1.0 -SkipBuild
 
-# Use a WiX CLI that is not on PATH, or an older one than the PATH provides.
+# Use a WiX CLI that is not on PATH, or another one than the PATH provides.
 .\scripts\package.ps1 -Version 0.1.0 -WixPath $env:USERPROFILE\.dotnet\tools\wix.exe
 
 # Sign the executable and the installer with a certificate in your store.
