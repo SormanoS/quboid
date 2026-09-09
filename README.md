@@ -176,3 +176,9 @@ complete corresponding source available to whoever receives it.
 Contributions are accepted under the agreement described in
 [`CONTRIBUTING.md`](CONTRIBUTING.md), which also lets the author license the
 project under other terms.
+
+## Privacy
+
+Quboid collects nothing and transmits nothing; it has no networking code at
+all. What it stores locally, and where, is described in
+[`PRIVACY.md`](PRIVACY.md).
