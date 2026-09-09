@@ -34,9 +34,28 @@ const SCHEMA_VERSION_FIELD: &str = "schema_version";
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Language {
-    #[default]
     Italian,
+    #[default]
     English,
+}
+
+impl Language {
+    /// The interface language a BCP 47 locale tag asks for, such as the
+    /// `it-CH` Windows reports for its user locale.
+    ///
+    /// Only the primary subtag is read, and anything Cuboid does not translate
+    /// falls back to English.
+    pub fn from_locale_tag(tag: &str) -> Self {
+        let primary = tag
+            .split(['-', '_'])
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        match primary.as_str() {
+            "it" => Self::Italian,
+            _ => Self::English,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -69,7 +88,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             schema_version: CURRENT_SCHEMA_VERSION,
-            language: Language::Italian,
+            language: Language::default(),
             launch_at_login: false,
             drag_snap_enabled: true,
             hotkeys: rectangle_default_hotkeys(),
@@ -175,6 +194,9 @@ pub struct ConfigImport {
     /// Where those sections were archived, when reading a stored document had to
     /// leave them behind. The archive is written once and never rewritten.
     pub archived_sections: Option<PathBuf>,
+    /// Whether no document existed and the settings are the built-in defaults,
+    /// the one moment a caller may still choose for the user.
+    pub defaulted: bool,
 }
 
 impl ConfigImport {
@@ -183,7 +205,14 @@ impl ConfigImport {
             config,
             discarded_sections: Vec::new(),
             archived_sections: None,
+            defaulted: false,
         }
+    }
+
+    #[must_use]
+    fn defaulted(mut self) -> Self {
+        self.defaulted = true;
+        self
     }
 }
 
@@ -290,7 +319,7 @@ impl_config_storage!(PortableConfigAdapter);
 
 fn load_path(path: &Path) -> Result<ConfigImport, ConfigStorageError> {
     let Some(json) = read_document(path)? else {
-        return Ok(ConfigImport::new(AppConfig::default()));
+        return Ok(ConfigImport::new(AppConfig::default()).defaulted());
     };
     let mut imported = import_json(&json)?;
     if !imported.discarded_sections.is_empty() {
@@ -446,6 +475,7 @@ pub fn import_value(value: Value) -> Result<ConfigImport, ConfigStorageError> {
         config,
         discarded_sections,
         archived_sections: None,
+        defaulted: false,
     })
 }
 
@@ -648,8 +678,31 @@ mod tests {
     fn missing_file_loads_defaults() {
         let directory = TestDirectory::new();
         let storage = PortableConfigAdapter::new(&directory.0);
-        assert_eq!(storage.load().unwrap().config, AppConfig::default());
+        let imported = storage.load().unwrap();
+        assert_eq!(imported.config, AppConfig::default());
+        assert!(
+            imported.defaulted,
+            "a load without a document must report that nothing was stored yet"
+        );
         assert!(!storage.config_path().exists());
+    }
+
+    #[test]
+    fn a_stored_document_is_not_reported_as_defaulted() {
+        let directory = TestDirectory::new();
+        let storage = PortableConfigAdapter::new(&directory.0);
+        storage.save(&AppConfig::default()).unwrap();
+        assert!(!storage.load().unwrap().defaulted);
+    }
+
+    #[test]
+    fn locale_tags_choose_the_interface_language() {
+        assert_eq!(Language::from_locale_tag("it"), Language::Italian);
+        assert_eq!(Language::from_locale_tag("IT-it"), Language::Italian);
+        assert_eq!(Language::from_locale_tag("it_IT"), Language::Italian);
+        assert_eq!(Language::from_locale_tag("en-GB"), Language::English);
+        assert_eq!(Language::from_locale_tag("fr-FR"), Language::English);
+        assert_eq!(Language::from_locale_tag(""), Language::English);
     }
 
     #[test]

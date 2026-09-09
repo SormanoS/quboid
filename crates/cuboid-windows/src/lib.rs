@@ -6,6 +6,8 @@ pub mod adapters;
 #[cfg(target_os = "windows")]
 mod appearance;
 #[cfg(target_os = "windows")]
+mod locale;
+#[cfg(target_os = "windows")]
 mod runtime;
 #[cfg(target_os = "windows")]
 mod startup;
@@ -20,6 +22,8 @@ pub use appearance::{
     RegistryIssue, RegistrySetting, RgbColor, WINDOWS_BLUE, WindowsAppearance,
     WindowsAppearanceProvider, WindowsTheme,
 };
+#[cfg(target_os = "windows")]
+pub use locale::system_language;
 #[cfg(target_os = "windows")]
 pub use runtime::{Runtime, RuntimeError};
 #[cfg(target_os = "windows")]

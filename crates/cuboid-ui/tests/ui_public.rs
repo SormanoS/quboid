@@ -9,7 +9,7 @@ use egui_kittest::{Harness, kittest::Queryable};
 
 #[test]
 fn action_button_emits_apply_intent() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
 
@@ -26,7 +26,7 @@ fn action_button_emits_apply_intent() {
 
 #[test]
 fn rectangle_action_cards_expose_new_standard_layouts() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let harness = ui_harness(&state, &intents);
 
@@ -35,7 +35,7 @@ fn rectangle_action_cards_expose_new_standard_layouts() {
 
 #[test]
 fn sidebar_brand_has_a_clear_vertical_hierarchy() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let harness = ui_harness(&state, &intents);
 
@@ -50,7 +50,7 @@ fn sidebar_brand_has_a_clear_vertical_hierarchy() {
 
 #[test]
 fn general_settings_emit_valid_configuration_and_file_intents() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
     harness.get_by_label("Generale").click();
@@ -86,7 +86,7 @@ fn the_general_sliders_are_wide_enough_to_aim_at_a_value() {
     use egui::accesskit::Role;
     use egui_kittest::{Node, kittest::By};
 
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
     harness.get_by_label("Generale").click();
@@ -107,7 +107,7 @@ fn the_general_sliders_are_wide_enough_to_aim_at_a_value() {
 
 #[test]
 fn shortcut_editor_adds_a_valid_binding() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
     harness.get_by_label("Scorciatoie").click();
@@ -136,7 +136,7 @@ fn shortcut_editor_adds_a_valid_binding() {
 
 #[test]
 fn shortcut_editor_shows_readable_localized_key_names() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
     harness.get_by_label("Scorciatoie").click();
@@ -147,7 +147,7 @@ fn shortcut_editor_shows_readable_localized_key_names() {
 
 #[test]
 fn shortcut_editor_uses_responsive_columns_and_keeps_the_status_at_the_bottom() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness_with_size(&state, &intents, egui::Vec2::new(1_920.0, 900.0));
     harness.get_by_label("Scorciatoie").click();
@@ -165,7 +165,7 @@ fn shortcut_editor_uses_responsive_columns_and_keeps_the_status_at_the_bottom() 
 
 #[test]
 fn shortcut_editor_keeps_scrolled_cards_inside_the_content_viewport() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness_with_size(&state, &intents, egui::Vec2::new(720.0, 560.0));
     harness.get_by_label("Scorciatoie").click();
@@ -206,7 +206,7 @@ fn shortcut_editor_keeps_scrolled_cards_inside_the_content_viewport() {
 
 #[test]
 fn shortcut_editor_rejects_duplicate_combinations_before_saving() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
     harness.get_by_label("Scorciatoie").click();
@@ -229,7 +229,7 @@ fn shortcut_editor_rejects_duplicate_combinations_before_saving() {
 
 #[test]
 fn editing_a_shortcut_suspends_global_hotkeys_until_capture_finishes() {
-    let mut config = AppConfig::default();
+    let mut config = italian_config();
     config.hotkeys.retain(|binding| binding.virtual_key != 0xBD);
     let state = Rc::new(RefCell::new(UiState::new(config)));
     let intents = Rc::new(RefCell::new(Vec::new()));
@@ -275,7 +275,7 @@ fn editing_a_shortcut_suspends_global_hotkeys_until_capture_finishes() {
 
 #[test]
 fn cancelling_shortcut_capture_resumes_global_hotkeys() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
     harness.get_by_label("Scorciatoie").click();
@@ -301,7 +301,7 @@ fn cancelling_shortcut_capture_resumes_global_hotkeys() {
 
 #[test]
 fn hiding_during_shortcut_capture_resumes_global_hotkeys() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
     harness.get_by_label("Scorciatoie").click();
@@ -330,7 +330,7 @@ fn hiding_during_shortcut_capture_resumes_global_hotkeys() {
 
 #[test]
 fn shortcut_capture_uses_the_physical_key_for_layout_dependent_symbols() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
     harness.get_by_label("Scorciatoie").click();
@@ -360,7 +360,7 @@ fn shortcut_capture_uses_the_physical_key_for_layout_dependent_symbols() {
 
 #[test]
 fn the_shell_shows_only_the_base_pages_without_an_extension() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let harness = ui_harness(&state, &intents);
 
@@ -374,7 +374,7 @@ fn the_shell_shows_only_the_base_pages_without_an_extension() {
 #[test]
 fn an_extension_page_is_reachable_and_forwards_its_intents_and_changes() {
     let state = Rc::new(RefCell::new(UiState::with_extension(
-        AppConfig::default(),
+        italian_config(),
         Box::new(TestExtension),
     )));
     let intents = Rc::new(RefCell::new(Vec::new()));
@@ -405,7 +405,7 @@ fn an_extension_page_is_reachable_and_forwards_its_intents_and_changes() {
 #[test]
 fn a_change_still_in_progress_is_not_written_yet() {
     let state = Rc::new(RefCell::new(UiState::with_extension(
-        AppConfig::default(),
+        italian_config(),
         Box::new(TestExtension),
     )));
     let intents = Rc::new(RefCell::new(Vec::new()));
@@ -442,7 +442,7 @@ fn generated_values_avoid_the_ones_already_taken() {
 
 #[test]
 fn runtime_status_is_exposed_to_accessibility_clients() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     state
         .borrow_mut()
         .handle_event(RuntimeEvent::NoActiveWindow);
@@ -454,7 +454,7 @@ fn runtime_status_is_exposed_to_accessibility_clients() {
 
 #[test]
 fn tray_hide_button_emits_hide_intent() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness(&state, &intents);
 
@@ -471,7 +471,7 @@ fn tray_hide_button_emits_hide_intent() {
 
 #[test]
 fn shortcut_toolbar_and_cards_stay_next_to_the_page_header() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness_with_size(&state, &intents, egui::Vec2::new(720.0, 560.0));
     harness.get_by_label("Scorciatoie").click();
@@ -500,7 +500,7 @@ fn shortcut_toolbar_and_cards_stay_next_to_the_page_header() {
 
 #[test]
 fn sidebar_footer_stays_compact_and_anchored_to_the_bottom() {
-    let state = Rc::new(RefCell::new(UiState::new(AppConfig::default())));
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
     let mut harness = ui_harness_with_size(&state, &intents, egui::Vec2::new(720.0, 560.0));
     harness.get_by_label("Generale").click();
@@ -538,8 +538,15 @@ fn english_configuration_localizes_actions_and_runtime_status() {
     let _status = harness.get_by_label("Windows prevents controlling an elevated window");
 }
 
-struct TestExtension;
+/// The defaults rendered in Italian, the language most assertions below read.
+fn italian_config() -> AppConfig {
+    AppConfig {
+        language: Language::Italian,
+        ..AppConfig::default()
+    }
+}
 
+struct TestExtension;
 impl TestExtension {
     const PAGES: &'static [ExtensionPage] = &[ExtensionPage {
         id: "test-page",
