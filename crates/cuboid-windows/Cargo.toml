@@ -1,0 +1,18 @@
+[package]
+name = "cuboid-windows"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Cuboid Base: the Win32 runtime and its snap, shortcut and window seams"
+
+[dependencies]
+crossbeam-channel.workspace = true
+cuboid-core = { path = "../cuboid-core" }
+thiserror.workspace = true
+tracing.workspace = true
+windows.workspace = true
+winreg.workspace = true
+
+[dev-dependencies]
+serial_test.workspace = true
