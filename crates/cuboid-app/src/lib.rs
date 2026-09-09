@@ -9,7 +9,7 @@ use cuboid_core::{
 use cuboid_ui::{UiExtension, UiIntent, UiState, theme};
 use cuboid_windows::{
     RegistrySetting, Runtime, RuntimeAdapters, WindowsAppearance, WindowsAppearanceProvider,
-    WindowsTheme, set_launch_at_login,
+    WindowsTheme, set_launch_at_login, system_language,
 };
 use eframe::egui;
 use tracing_subscriber::EnvFilter;
@@ -153,7 +153,16 @@ pub fn run(profile: Profile) -> eframe::Result {
             "the configuration contained settings this build does not support; they were not loaded, and a copy was kept next to the document"
         );
     }
-    let config = imported.config;
+    let mut config = imported.config;
+    if imported.defaulted {
+        // First run: nothing records a choice yet, so follow Windows and keep
+        // the picked language by writing it out.
+        config.language = system_language();
+        if let Err(error) = storage.save(&config) {
+            tracing::error!(%error, "could not store the initial configuration");
+        }
+    }
+    let config = config;
     if let Ok(executable) = std::env::current_exe()
         && let Err(error) = set_launch_at_login(product, config.launch_at_login, &executable)
     {
