@@ -1,19 +1,19 @@
-# Cuboid
+# Quboid
 
-Cuboid is a native Windows window manager written in Rust. It provides global
+Quboid is a native Windows window manager written in Rust. It provides global
 shortcuts, multi-monitor placement, edge and corner drag snapping and a native
 settings window.
 
 The project currently targets Windows 10 22H2 and Windows 11 on x86_64.
 
-Cuboid starts in the notification area instead of opening its settings window.
+Quboid starts in the notification area instead of opening its settings window.
 Windows controls whether its icon is shown directly on the taskbar or under the
 hidden-icons menu.
 
 ## Development
 
 ```powershell
-cargo run -p cuboid-app
+cargo run -p quboid-app
 cargo test --workspace
 ```
 
@@ -31,7 +31,7 @@ The Windows E2E test requires an interactive desktop and an executable allowed
 by the local application-control policy; pass a signed build with
 `-ExecutablePath` when unsigned binaries are blocked.
 
-Cuboid runs with the current user's privileges. Windows intentionally prevents
+Quboid runs with the current user's privileges. Windows intentionally prevents
 it from controlling elevated windows.
 
 ## Features
@@ -46,10 +46,10 @@ it from controlling elevated windows.
 ## Architecture
 
 ```text
-crates/cuboid-core      actions, geometry and the configuration document
-crates/cuboid-windows   the Win32 runtime: hooks, monitors, DPI, overlay
-crates/cuboid-ui        the settings window: shell, theme and pages
-crates/cuboid-app       the composition root, as a library and a binary
+crates/quboid-core      actions, geometry and the configuration document
+crates/quboid-windows   the Win32 runtime: hooks, monitors, DPI, overlay
+crates/quboid-ui        the settings window: shell, theme and pages
+crates/quboid-app       the composition root, as a library and a binary
 ```
 
 The Windows runtime is a deep module behind a command/event interface. Three
@@ -66,17 +66,17 @@ The settings window exposes `UiExtension`, so a host can contribute pages while
 reusing the navigation rail, theme and shared controls. A hosted page reports
 whether its change is still in progress or ready to be written, so continuous
 edits stay visible to the runtime without rewriting the document on every frame.
-`cuboid_app::run` accepts a `Profile` (storage, runtime adapters and optional
+`quboid_app::run` accepts a `Profile` (storage, runtime adapters and optional
 extra pages), so a host can reuse the whole application shell.
 
 ## Configuration
 
-The document is stored at `%APPDATA%\Cuboid\config.json`, or next to the
+The document is stored at `%APPDATA%\Quboid\config.json`, or next to the
 executable when a `portable.flag` file is present. Documents written by earlier
 versions are migrated on load; settings that this build does not support are
 reported and left out instead of being rewritten.
 
-Before such settings disappear from the document, Cuboid copies them once to
+Before such settings disappear from the document, Quboid copies them once to
 `config.json.unsupported.json` next to it. That archive is written a single time
 and never rewritten, so a configuration written by another distribution survives
 the first save of this build. A document that keeps the Base settings in a
@@ -106,11 +106,11 @@ it asks organizations above a revenue threshold to sponsor the toolset.
 cargo build --locked --release --target x86_64-pc-windows-msvc
 ```
 
-The binary is written to `target\x86_64-pc-windows-msvc\release\cuboid-app.exe`
+The binary is written to `target\x86_64-pc-windows-msvc\release\quboid-app.exe`
 and needs no installation: it runs from wherever it is.
 
-`crates\cuboid-app\build.rs` compiles `cuboid.rc`, the resource script that embeds
-`cuboid.exe.manifest`. That manifest is what asks Windows for per-monitor DPI
+`crates\quboid-app\build.rs` compiles `quboid.rc`, the resource script that embeds
+`quboid.exe.manifest`. That manifest is what asks Windows for per-monitor DPI
 awareness and for the privileges of the current user, so window geometry stays
 correct on mixed-DPI setups. The build locates `rc.exe` in the installed Windows
 SDK on its own, so editing the manifest needs no extra step: a plain
@@ -125,16 +125,16 @@ SDK on its own, so editing the manifest needs no extra step: a plain
 The script builds the release executable, checks that the manifest embedded in
 it is the expected one, and writes three files to `dist`:
 
-- `Cuboid-<version>-windows-x64.msi`: a per-user installer. It installs into
-  `%LOCALAPPDATA%\Cuboid`, adds a Start Menu shortcut, upgrades an older version
+- `Quboid-<version>-windows-x64.msi`: a per-user installer. It installs into
+  `%LOCALAPPDATA%\Quboid`, adds a Start Menu shortcut, upgrades an older version
   in place and needs no administrator rights;
-- `Cuboid-<version>-windows-x64-portable.zip`: the executable, this README and
-  the licence, plus a `portable.flag` file. That flag is what makes Cuboid keep
+- `Quboid-<version>-windows-x64-portable.zip`: the executable, this README and
+  the licence, plus a `portable.flag` file. That flag is what makes Quboid keep
   its configuration and logs next to the executable instead of under `%APPDATA%`,
   so the archive can be unpacked onto a USB stick;
 - `SHA256SUMS.txt`: the checksums of both artifacts.
 
-WiX also leaves a `Cuboid-<version>-windows-x64.wixpdb` next to them. It holds
+WiX also leaves a `Quboid-<version>-windows-x64.wixpdb` next to them. It holds
 the debug symbols of the installer and is not part of a release.
 
 ```powershell
@@ -157,8 +157,8 @@ the debug symbols of the installer and is not part of a release.
 This verifies the checksums, the contents of the portable archive and the
 properties of the installer, and reads back the manifest embedded in the shipped
 executable. With `-InstallSmoke` it also installs the MSI silently, checks that
-the executable landed in `%LOCALAPPDATA%\Cuboid` and uninstalls it again; it
-refuses to run that step when Cuboid is already installed, so it never replaces
+the executable landed in `%LOCALAPPDATA%\Quboid` and uninstalls it again; it
+refuses to run that step when Quboid is already installed, so it never replaces
 your own installation.
 
 `.\scripts\test-all.ps1` runs the whole chain: formatting, tests, lints, the
@@ -166,10 +166,10 @@ release build, the Windows end-to-end test, packaging and these checks.
 
 ## License
 
-Cuboid is free software, distributed under the GNU General Public License,
+Quboid is free software, distributed under the GNU General Public License,
 version 3. See [`LICENSE`](LICENSE).
 
-You may use, study, modify and redistribute Cuboid, including commercially. If
+You may use, study, modify and redistribute Quboid, including commercially. If
 you distribute it, modified or not, you must do so under the GPL and make the
 complete corresponding source available to whoever receives it.
 

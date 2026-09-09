@@ -72,7 +72,7 @@ jobs:
       - name: Upload the artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: cuboid-${{ steps.version.outputs.version }}-windows-x64
+          name: quboid-${{ steps.version.outputs.version }}-windows-x64
           if-no-files-found: error
           path: |
             dist/*.msi
@@ -87,19 +87,19 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           $Notes = @"
-          Cuboid $env:VERSION for Windows on x86_64.
+          Quboid $env:VERSION for Windows on x86_64.
 
-          - ``Cuboid-$env:VERSION-windows-x64.msi``: per-user installer, no administrator rights needed.
-          - ``Cuboid-$env:VERSION-windows-x64-portable.zip``: portable build that keeps its configuration next to the executable.
+          - ``Quboid-$env:VERSION-windows-x64.msi``: per-user installer, no administrator rights needed.
+          - ``Quboid-$env:VERSION-windows-x64-portable.zip``: portable build that keeps its configuration next to the executable.
 
           Verify a download against ``SHA256SUMS.txt``.
 
           These binaries are unsigned, so Windows SmartScreen warns the first time you run them.
           "@
           gh release create "v$env:VERSION" `
-            "dist/Cuboid-$env:VERSION-windows-x64.msi" `
-            "dist/Cuboid-$env:VERSION-windows-x64-portable.zip" `
+            "dist/Quboid-$env:VERSION-windows-x64.msi" `
+            "dist/Quboid-$env:VERSION-windows-x64-portable.zip" `
             "dist/SHA256SUMS.txt" `
-            --title "Cuboid $env:VERSION" `
+            --title "Quboid $env:VERSION" `
             --notes $Notes `
             --verify-tag

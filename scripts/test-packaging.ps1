@@ -9,11 +9,11 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $Dist = Join-Path $Root "dist"
-$Zip = Join-Path $Dist "Cuboid-$Version-windows-x64-portable.zip"
-$Msi = Join-Path $Dist "Cuboid-$Version-windows-x64.msi"
+$Zip = Join-Path $Dist "Quboid-$Version-windows-x64-portable.zip"
+$Msi = Join-Path $Dist "Quboid-$Version-windows-x64.msi"
 $Checksums = Join-Path $Dist "SHA256SUMS.txt"
-$Workspace = Join-Path ([System.IO.Path]::GetTempPath()) "cuboid-package-test-$PID"
-$InstalledExecutable = Join-Path $env:LOCALAPPDATA "Cuboid\cuboid-app.exe"
+$Workspace = Join-Path ([System.IO.Path]::GetTempPath()) "quboid-package-test-$PID"
+$InstalledExecutable = Join-Path $env:LOCALAPPDATA "Quboid\quboid-app.exe"
 $InstalledByTest = $false
 
 foreach ($Path in $Zip, $Msi, $Checksums) {
@@ -35,7 +35,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $Archive = [System.IO.Compression.ZipFile]::OpenRead($Zip)
 try {
     $Entries = $Archive.Entries.FullName
-    foreach ($Required in "cuboid-app.exe", "README.md", "LICENSE", "portable.flag") {
+    foreach ($Required in "quboid-app.exe", "README.md", "LICENSE", "portable.flag") {
         if ($Entries -notcontains $Required) {
             throw "Portable archive is missing $Required."
         }
@@ -58,7 +58,7 @@ function Get-MsiProperty {
     return $Record.StringData(1)
 }
 
-if ((Get-MsiProperty "ProductName") -ne "Cuboid") {
+if ((Get-MsiProperty "ProductName") -ne "Quboid") {
     throw "MSI ProductName is invalid."
 }
 if ((Get-MsiProperty "ProductVersion") -ne $Version) {
@@ -68,7 +68,7 @@ if ((Get-MsiProperty "ProductVersion") -ne $Version) {
 New-Item -ItemType Directory -Path $Workspace -Force | Out-Null
 try {
     [System.IO.Compression.ZipFile]::ExtractToDirectory($Zip, $Workspace)
-    $PortableExecutable = Join-Path $Workspace "cuboid-app.exe"
+    $PortableExecutable = Join-Path $Workspace "quboid-app.exe"
     if (-not (Test-Path -LiteralPath $PortableExecutable)) {
         throw "Portable executable could not be extracted."
     }
@@ -99,7 +99,7 @@ try {
 
     if ($InstallSmoke) {
         if (Test-Path -LiteralPath $InstalledExecutable) {
-            throw "Cuboid is already installed; refusing to replace an existing installation."
+            throw "Quboid is already installed; refusing to replace an existing installation."
         }
         $Install = Start-Process -FilePath "msiexec.exe" `
             -ArgumentList @("/i", $Msi, "/qn", "/norestart") `
@@ -110,7 +110,7 @@ try {
         }
         $InstalledByTest = $true
         if (-not (Test-Path -LiteralPath $InstalledExecutable)) {
-            throw "MSI did not install the Cuboid executable."
+            throw "MSI did not install the Quboid executable."
         }
     }
 }
@@ -129,4 +129,4 @@ finally {
     }
 }
 
-Write-Output "Cuboid packaging tests passed."
+Write-Output "Quboid packaging tests passed."
