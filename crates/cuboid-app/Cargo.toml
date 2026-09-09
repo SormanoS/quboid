@@ -1,0 +1,31 @@
+[package]
+name = "cuboid-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Cuboid Base: window management for Windows"
+
+[lib]
+name = "cuboid_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cuboid-app"
+path = "src/main.rs"
+
+[dependencies]
+crossbeam-channel.workspace = true
+cuboid-core = { path = "../cuboid-core" }
+cuboid-ui = { path = "../cuboid-ui" }
+cuboid-windows = { path = "../cuboid-windows" }
+eframe.workspace = true
+rfd.workspace = true
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+tray-icon.workspace = true
+windows.workspace = true
+
+[build-dependencies]
+embed-resource.workspace = true

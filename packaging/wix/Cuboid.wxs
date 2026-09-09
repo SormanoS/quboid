@@ -1,0 +1,32 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Cuboid"
+    Manufacturer="Cuboid contributors"
+    Version="$(var.Version)"
+    UpgradeCode="{87C56635-D3B0-4E65-9877-B97FF7BE60D5}"
+    Scope="perUser">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Cuboid is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="Cuboid" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="MainFeature" Title="Cuboid" Level="1">
+      <ComponentRef Id="MainExecutable" />
+    </Feature>
+
+    <Component Id="MainExecutable" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="CuboidExe" Source="$(var.SourceDir)\cuboid-app.exe" KeyPath="yes">
+        <Shortcut
+          Id="StartMenuShortcut"
+          Directory="ProgramMenuFolder"
+          Name="Cuboid"
+          WorkingDirectory="INSTALLFOLDER"
+          Advertise="no" />
+      </File>
+      <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+    </Component>
+  </Package>
+</Wix>
