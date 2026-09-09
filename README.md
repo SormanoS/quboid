@@ -148,6 +148,48 @@ the debug symbols of the installer and is not part of a release.
 .\scripts\package.ps1 -Version 0.1.0 -CertificateThumbprint <thumbprint>
 ```
 
+### The Store package
+
+```powershell
+.\scripts\package-msix.ps1
+```
+
+This writes `dist\Quboid-<version>-windows-x64.msix`, a full-trust packaged
+build for the Microsoft Store. The package is deliberately left unsigned: the
+Store re-signs submitted MSIX packages itself, and the `Publisher` in
+`packaging\msix\AppxManifest.xml` is the identifier Partner Center assigned to
+the reserved name rather than a certificate anyone holds.
+
+```powershell
+# Register the staged layout instead of packing it. The app then runs with
+# real package identity, which is the only way to exercise the packaged
+# behaviour, and it needs Developer Mode but no certificate and no admin.
+.\scripts\package-msix.ps1 -Register
+```
+
+Launch-at-login differs between the two builds. A packaged build has no say
+over the Run key, so it drives the `StartupTask` the manifest declares; every
+other build writes `HKCU\...\CurrentVersion\Run` as before. Both paths live
+behind `set_launch_at_login`.
+
+### Icons
+
+```powershell
+.\scripts\generate-icons.ps1
+```
+
+Every icon is drawn from one description, so the executable, the tray and the
+Store package cannot drift apart. The script writes `quboid.ico`, which
+`quboid.rc` embeds into the executable, and the scale- and target-size
+variants under `packaging\msix\assets`. Those variants are named for Windows
+to resolve, which it only does through the resource index `package-msix.ps1`
+builds with `makepri`; the index is what lets the manifest name
+`Square44x44Logo.png` even though no file has that exact name.
+
+Pass `-PreviewPath <file.png>` to render the mark at the sizes that decide
+whether it still reads, on both a light and a dark surface, without touching
+the assets.
+
 ### Checking the artifacts
 
 ```powershell
@@ -176,3 +218,9 @@ complete corresponding source available to whoever receives it.
 Contributions are accepted under the agreement described in
 [`CONTRIBUTING.md`](CONTRIBUTING.md), which also lets the author license the
 project under other terms.
+
+## Privacy
+
+Quboid collects nothing and transmits nothing; it has no networking code at
+all. What it stores locally, and where, is described in
+[`PRIVACY.md`](PRIVACY.md).

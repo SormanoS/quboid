@@ -3,16 +3,21 @@
 <!--
   Package identity for the Microsoft Store.
 
-  Name, Publisher and PublisherDisplayName must match the values Partner
-  Center assigns once the "Quboid" name is reserved: until then the values
-  below only identify local test builds. scripts\package-msix.ps1 rewrites
-  Version from the workspace manifest and can override identity, so nothing
-  here has to be edited by hand for a test package.
+  Name, Publisher and PublisherDisplayName are the values Partner Center
+  assigned to the reserved "Quboid" name and must be reproduced exactly:
+  a package whose identity disagrees with them is rejected on upload.
+  The Publisher is a per-account identifier, not a certificate the developer
+  holds; the Store signs the package to match it. scripts\package-msix.ps1
+  rewrites Version from the workspace manifest and can override identity for
+  local experiments.
 
   The application runs at full trust. A packaged full-trust desktop app is
   not placed in an app container, so global hooks, RegisterHotKey and the
   window manipulation Quboid relies on behave as they do unpackaged, and
-  neither the registry nor %APPDATA% is virtualised.
+  neither the registry nor %APPDATA% is virtualised. Writes to %APPDATA% are
+  redirected into the package's LocalCache, which reads fall through to the
+  real folder until the first write, so an existing installation's settings
+  carry over.
 -->
 
 <Package
@@ -23,8 +28,8 @@
   IgnorableNamespaces="uap uap5 rescap">
 
   <Identity
-    Name="SormanoS.Quboid"
-    Publisher="CN=Samuele Sormano"
+    Name="SamueleSormano.Quboid"
+    Publisher="CN=07B33FD2-681B-4258-A3B1-56423067842B"
     Version="0.1.0.0"
     ProcessorArchitecture="x64" />
 
