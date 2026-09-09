@@ -166,5 +166,13 @@ release build, the Windows end-to-end test, packaging and these checks.
 
 ## License
 
-Cuboid is distributed under the Mozilla Public License, Version 2.0. See
-[`LICENSE`](LICENSE). Each source file carries the MPL-2.0 notice.
+Cuboid is free software, distributed under the GNU General Public License,
+version 3. See [`LICENSE`](LICENSE).
+
+You may use, study, modify and redistribute Cuboid, including commercially. If
+you distribute it, modified or not, you must do so under the GPL and make the
+complete corresponding source available to whoever receives it.
+
+Contributions are accepted under the agreement described in
+[`CONTRIBUTING.md`](CONTRIBUTING.md), which also lets the author license the
+project under other terms.
