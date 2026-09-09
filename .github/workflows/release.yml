@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to package, without the leading v.
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Build, package and publish
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+
+      - name: Install the WiX CLI
+        run: |
+          dotnet tool install --global wix
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      # A tag that disagrees with Cargo.toml would publish artifacts whose
+      # names do not match the code inside them, so it stops the release.
+      - name: Resolve and check the version
+        id: version
+        run: |
+          $Manifest = Get-Content Cargo.toml -Raw
+          if ($Manifest -notmatch '(?m)^version = "(?<version>[^"]+)"') {
+              throw "No version found under [workspace.package] in Cargo.toml."
+          }
+          $Manifested = $Matches.version
+          $Requested = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+              "${{ inputs.version }}"
+          }
+          else {
+              "${{ github.ref_name }}" -replace "^v", ""
+          }
+          if ($Requested -ne $Manifested) {
+              throw "Requested version $Requested does not match Cargo.toml version $Manifested."
+          }
+          "version=$Manifested" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+
+      - name: Build the release executable
+        run: cargo build --locked --release --target x86_64-pc-windows-msvc
+
+      - name: Test
+        run: cargo test --workspace --locked -- --test-threads=1
+
+      - name: Package
+        run: .\scripts\package.ps1 -Version ${{ steps.version.outputs.version }} -SkipBuild
+
+      - name: Verify the artifacts, installing the MSI
+        run: .\scripts\test-packaging.ps1 -Version ${{ steps.version.outputs.version }} -InstallSmoke
+
+      - name: Upload the artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuboid-${{ steps.version.outputs.version }}-windows-x64
+          if-no-files-found: error
+          path: |
+            dist/*.msi
+            dist/*.zip
+            dist/SHA256SUMS.txt
+
+      # The .wixpdb WiX leaves in dist holds installer debug symbols and is
+      # deliberately left out of the published files.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $Notes = @"
+          Cuboid $env:VERSION for Windows on x86_64.
+
+          - ``Cuboid-$env:VERSION-windows-x64.msi``: per-user installer, no administrator rights needed.
+          - ``Cuboid-$env:VERSION-windows-x64-portable.zip``: portable build that keeps its configuration next to the executable.
+
+          Verify a download against ``SHA256SUMS.txt``.
+
+          These binaries are unsigned, so Windows SmartScreen warns the first time you run them.
+          "@
+          gh release create "v$env:VERSION" `
+            "dist/Cuboid-$env:VERSION-windows-x64.msi" `
+            "dist/Cuboid-$env:VERSION-windows-x64-portable.zip" `
+            "dist/SHA256SUMS.txt" `
+            --title "Cuboid $env:VERSION" `
+            --notes $Notes `
+            --verify-tag
