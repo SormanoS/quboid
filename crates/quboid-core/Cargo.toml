@@ -2,6 +2,7 @@
 name = "quboid-core"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Quboid Base: actions, geometry and the configuration document"

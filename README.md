@@ -208,6 +208,8 @@ release build, the Windows end-to-end test, packaging and these checks.
 
 ## License
 
+Copyright (C) 2026 Samuele Sormano.
+
 Quboid is free software, distributed under the GNU General Public License,
 version 3. See [`LICENSE`](LICENSE).
 

@@ -2,6 +2,7 @@
 name = "quboid-ui"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Quboid Base: the settings window, its theme and its extension seam"
