@@ -40,7 +40,7 @@ it from controlling elevated windows.
 - Movement between monitors with negative-coordinate and mixed-DPI support
 - Configurable global shortcuts, one action per shortcut
 - Edge and corner drag snapping with a non-interactive overlay
-- Italian and English interface, tray mode and launch at login
+- Italian and English interface, picked from the Windows user locale on first run, tray mode and launch at login
 - Versioned JSON configuration with import/export and portable mode
 
 ## Architecture
