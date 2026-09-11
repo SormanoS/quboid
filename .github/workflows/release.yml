@@ -19,6 +19,9 @@ jobs:
   release:
     name: Build, package and publish
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      store: ${{ steps.version.outputs.store }}
     steps:
       - uses: actions/checkout@v4
 
@@ -57,6 +60,12 @@ jobs:
           }
           "version=$Manifested" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
 
+          # An MSIX identity is major.minor.patch.0, so a prerelease version has
+          # no package the Store would accept. Such a tag still produces a
+          # GitHub release; it just stops before the Store.
+          $Store = if ($Manifested -match '^\d+\.\d+\.\d+$') { "true" } else { "false" }
+          "store=$Store" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+
       - name: Build the release executable
         run: cargo build --locked --release --target x86_64-pc-windows-msvc
 
@@ -68,6 +77,20 @@ jobs:
 
       - name: Verify the artifacts, installing the MSI
         run: .\scripts\test-packaging.ps1 -Version ${{ steps.version.outputs.version }} -InstallSmoke
+
+      # The MSIX is unsigned because the Store signs what it accepts, so it is
+      # kept out of the GitHub release and handed to the store job instead.
+      - name: Package the MSIX
+        if: steps.version.outputs.store == 'true'
+        run: .\scripts\package-msix.ps1 -Version ${{ steps.version.outputs.version }} -SkipBuild
+
+      - name: Upload the MSIX
+        if: steps.version.outputs.store == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quboid-${{ steps.version.outputs.version }}-msix
+          if-no-files-found: error
+          path: dist/*.msix
 
       - name: Upload the artifacts
         uses: actions/upload-artifact@v4
@@ -103,3 +126,79 @@ jobs:
             --title "Quboid $env:VERSION" `
             --notes $Notes `
             --verify-tag
+
+  # Partner Center still owns the parts an API cannot create: the reserved name,
+  # the listing and the first submission all have to exist before this job can
+  # do anything. From then on every tag ships its MSIX on its own.
+  #
+  # The Store refuses a package whose version is not above the published one,
+  # which semver tags already guarantee. The consequence is that a submission
+  # that fails certification cannot be retried under the same version: the fix
+  # needs a new patch release.
+  store:
+    name: Submit to the Microsoft Store
+    needs: release
+    if: needs.release.outputs.store == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: quboid-${{ needs.release.outputs.version }}-msix
+          path: dist
+
+      # Secrets are unreadable from a job-level condition, so a fork or a clone
+      # without Store credentials reports the skip here rather than failing.
+      - name: Check the Store credentials
+        id: credentials
+        env:
+          PRODUCT_ID: ${{ secrets.STORE_PRODUCT_ID }}
+          TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+          SELLER_ID: ${{ secrets.STORE_SELLER_ID }}
+          CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+        run: |
+          $Missing = @("PRODUCT_ID", "TENANT_ID", "SELLER_ID", "CLIENT_ID", "CLIENT_SECRET") |
+              Where-Object { -not [Environment]::GetEnvironmentVariable("$_") }
+          if ($Missing.Count -eq 5) {
+              Write-Warning "No Store credentials are configured; skipping the submission."
+              "configured=false" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+              return
+          }
+          if ($Missing) {
+              throw "Store credentials are incomplete; missing: $($Missing -join ', ')."
+          }
+          "configured=true" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+
+      - name: Install the Microsoft Store CLI
+        if: steps.credentials.outputs.configured == 'true'
+        uses: microsoft/microsoft-store-apppublisher@v1.4
+
+      - name: Configure the Store credentials
+        if: steps.credentials.outputs.configured == 'true'
+        run: |
+          msstore reconfigure `
+            --tenantId ${{ secrets.STORE_TENANT_ID }} `
+            --sellerId ${{ secrets.STORE_SELLER_ID }} `
+            --clientId ${{ secrets.STORE_CLIENT_ID }} `
+            --clientSecret ${{ secrets.STORE_CLIENT_SECRET }}
+
+      # This uploads the package, commits the draft and starts certification,
+      # which Microsoft runs asynchronously; poll reports the outcome, so a
+      # rejection fails the job instead of passing silently.
+      - name: Submit the MSIX
+        if: steps.credentials.outputs.configured == 'true'
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          msstore publish "dist/Quboid-$env:VERSION-windows-x64.msix" -id ${{ secrets.STORE_PRODUCT_ID }}
+          if ($LASTEXITCODE -ne 0) {
+              throw "The Store submission failed."
+          }
+
+      - name: Wait for the submission to publish
+        if: steps.credentials.outputs.configured == 'true'
+        run: |
+          msstore submission poll ${{ secrets.STORE_PRODUCT_ID }}
+          if ($LASTEXITCODE -ne 0) {
+              throw "The Store submission did not publish."
+          }

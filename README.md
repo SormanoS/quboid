@@ -206,6 +206,30 @@ your own installation.
 `.\scripts\test-all.ps1` runs the whole chain: formatting, tests, lints, the
 release build, the Windows end-to-end test, packaging and these checks.
 
+### Releasing
+
+Pushing a `vX.Y.Z` tag runs `.github\workflows\release.yml`, which refuses to go
+on unless the tag matches the version in `Cargo.toml`, then publishes the MSI,
+the portable archive and the checksums as a GitHub release and submits the MSIX
+to the Microsoft Store.
+
+`Cargo.toml` is the only place a version is written. The MSIX identity derives
+from it as `X.Y.Z.0`: the fourth part belongs to the Store and stays zero, which
+is why a prerelease tag such as `v1.0.0-rc.1` produces a GitHub release but no
+Store submission. The Store also rejects a package that does not outrank the
+published one, so a submission that fails certification cannot be retried under
+the same version; the fix ships as a new patch release.
+
+The submission needs five repository secrets — `STORE_PRODUCT_ID`,
+`STORE_TENANT_ID`, `STORE_SELLER_ID`, `STORE_CLIENT_ID` and
+`STORE_CLIENT_SECRET` — obtained from Partner Center and a Microsoft Entra ID
+application holding the Manager role on the account. With none of them set the
+job reports a skip instead of failing, so a fork releases without them. Partner
+Center still owns what no API can create: the reserved name, the listing and the
+first submission are done by hand once, and every tag after that ships on its
+own. Certification itself is asynchronous, so the job waits on the outcome and
+fails if Microsoft rejects the package.
+
 ## License
 
 Copyright (C) 2026 Samuele Sormano.
