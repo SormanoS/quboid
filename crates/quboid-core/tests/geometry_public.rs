@@ -189,3 +189,49 @@ proptest! {
         }
     }
 }
+
+#[test]
+fn normalizing_a_placement_survives_a_monitor_that_changes_size() {
+    let work = Rect::new(0, 0, 1920, 1040);
+    let docked = Rect::new(-3840, -200, 0, 1960);
+    let left_half =
+        LayoutEngine::target(Action::LeftHalf, Rect::new(0, 0, 800, 600), work).unwrap();
+
+    let bounds = LayoutEngine::normalize(left_half, work).unwrap();
+
+    assert_eq!(LayoutEngine::area_target(bounds, work), Some(left_half));
+    assert_eq!(
+        LayoutEngine::area_target(bounds, docked),
+        Some(Rect::new(-3840, -200, -1920, 1960))
+    );
+}
+
+#[test]
+fn normalizing_clamps_a_placement_that_reaches_outside_the_work_area() {
+    let work = Rect::new(0, 0, 1000, 1000);
+
+    let bounds = LayoutEngine::normalize(Rect::new(-500, 500, 1500, 2000), work).unwrap();
+
+    assert_eq!(
+        LayoutEngine::area_target(bounds, work),
+        Some(Rect::new(0, 500, 1000, 1000))
+    );
+}
+
+#[test]
+fn normalizing_rejects_degenerate_rectangles() {
+    let work = Rect::new(0, 0, 1000, 1000);
+
+    assert_eq!(
+        LayoutEngine::normalize(Rect::new(10, 10, 10, 100), work),
+        None
+    );
+    assert_eq!(
+        LayoutEngine::normalize(Rect::new(10, 10, 100, 100), Rect::new(0, 0, 0, 0)),
+        None
+    );
+    assert_eq!(
+        LayoutEngine::normalize(Rect::new(2000, 10, 3000, 100), work),
+        None
+    );
+}
