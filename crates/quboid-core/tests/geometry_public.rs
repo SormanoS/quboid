@@ -1,3 +1,4 @@
+use proptest::prelude::*;
 use quboid_core::{Action, LayoutEngine, Rect};
 
 #[test]
@@ -94,4 +95,97 @@ fn rect_reports_dimensions_validity_and_intersection() {
     assert!(first.is_valid());
     assert_eq!(first.intersection_area(second), 30_000);
     assert_eq!(first.intersection_area(Rect::new(301, 251, 500, 500)), 0);
+}
+
+#[test]
+fn halves_cover_odd_negative_work_area_without_overlap() {
+    let work = Rect::new(-1921, 0, 0, 1081);
+    let current = Rect::new(-1000, 100, -500, 600);
+    let left = LayoutEngine::target(Action::LeftHalf, current, work).unwrap();
+    let right = LayoutEngine::target(Action::RightHalf, current, work).unwrap();
+
+    assert_eq!(left.left, work.left);
+    assert_eq!(left.right, right.left);
+    assert_eq!(right.right, work.right);
+    assert_eq!(left.width() + right.width(), work.width());
+}
+
+#[test]
+fn thirds_distribute_all_pixels() {
+    let work = Rect::new(0, 0, 100, 80);
+    let current = Rect::new(0, 0, 10, 10);
+    let first = LayoutEngine::target(Action::FirstThird, current, work).unwrap();
+    let center = LayoutEngine::target(Action::CenterThird, current, work).unwrap();
+    let last = LayoutEngine::target(Action::LastThird, current, work).unwrap();
+
+    assert_eq!(first.right, center.left);
+    assert_eq!(center.right, last.left);
+    assert_eq!(first.width() + center.width() + last.width(), 100);
+}
+
+#[test]
+fn monitor_mapping_preserves_relative_geometry() {
+    let from = Rect::new(-1920, 0, 0, 1080);
+    let to = Rect::new(0, 0, 2560, 1440);
+    let current = Rect::new(-1920, 0, -960, 1080);
+
+    assert_eq!(
+        LayoutEngine::map_to_monitor(current, from, to),
+        Some(Rect::new(0, 0, 1280, 1440))
+    );
+}
+
+#[test]
+fn incremental_moves_stay_inside_work_area() {
+    let work = Rect::new(-100, -50, 900, 750);
+    let current = Rect::new(-100, -50, 300, 250);
+
+    assert_eq!(
+        LayoutEngine::target(Action::MoveLeft, current, work),
+        Some(current)
+    );
+    assert_eq!(
+        LayoutEngine::target(Action::MoveDown, current, work),
+        Some(Rect::new(-100, -10, 300, 290))
+    );
+}
+
+proptest! {
+    #[test]
+    fn every_geometric_target_is_valid_and_contained(
+        left in -10_000i32..10_000,
+        top in -10_000i32..10_000,
+        width in 1i32..5_000,
+        height in 1i32..5_000,
+        x_seed in 0u32..10_000,
+        y_seed in 0u32..10_000,
+        width_seed in 1u32..10_000,
+        height_seed in 1u32..10_000,
+    ) {
+        let work = Rect::new(left, top, left + width, top + height);
+        let x = i32::try_from(x_seed % width as u32).unwrap_or(0);
+        let y = i32::try_from(y_seed % height as u32).unwrap_or(0);
+        let available_width = width - x;
+        let available_height = height - y;
+        let current_width =
+            1 + i32::try_from(width_seed % available_width as u32).unwrap_or(0);
+        let current_height =
+            1 + i32::try_from(height_seed % available_height as u32).unwrap_or(0);
+        let current = Rect::new(
+            left + x,
+            top + y,
+            left + x + current_width,
+            top + y + current_height,
+        );
+
+        for action in Action::ALL {
+            if let Some(target) = LayoutEngine::target(action, current, work) {
+                prop_assert!(target.is_valid());
+                prop_assert!(target.left >= work.left);
+                prop_assert!(target.top >= work.top);
+                prop_assert!(target.right <= work.right);
+                prop_assert!(target.bottom <= work.bottom);
+            }
+        }
+    }
 }

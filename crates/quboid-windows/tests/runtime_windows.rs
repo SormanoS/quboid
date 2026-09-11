@@ -8,10 +8,12 @@ use std::{
 };
 
 use quboid_core::{
-    Action, AppConfig, ConfigError, HotkeyBinding, NormalizedRect, Rect, RuntimeCommand,
+    Action, AppConfig, ConfigError, HotkeyBinding, Language, NormalizedRect, Rect, RuntimeCommand,
     RuntimeEvent,
 };
-use quboid_windows::{Runtime, RuntimeAdapters, RuntimeError, WindowFilter, set_launch_at_login};
+use quboid_windows::{
+    Runtime, RuntimeAdapters, RuntimeError, WindowFilter, set_launch_at_login, system_language,
+};
 use serial_test::serial;
 use windows::{
     Win32::{
@@ -665,4 +667,20 @@ impl Drop for RegistryValueRestore {
             let _ = run.delete_value("Quboid");
         }
     }
+}
+
+#[test]
+fn the_user_locale_names_a_language() {
+    // Whatever this machine is set to, a locale must resolve to a language
+    // Quboid can render.
+    let _ = system_language();
+}
+
+#[test]
+fn windows_locale_tags_map_to_an_interface_language() {
+    assert_eq!(Language::from_locale_tag("it-IT"), Language::Italian);
+    assert_eq!(Language::from_locale_tag("it-CH"), Language::Italian);
+    assert_eq!(Language::from_locale_tag("en-US"), Language::English);
+    assert_eq!(Language::from_locale_tag("de-DE"), Language::English);
+    assert_eq!(Language::from_locale_tag(""), Language::English);
 }

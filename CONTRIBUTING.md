@@ -69,5 +69,15 @@ Note that `cargo test` runs a guard that fails if separately licensed types,
 pages or runtime logic appear in this tree. If it fires, your change is touching
 material that belongs to another distribution; open an issue instead.
 
+## Where tests live
+
+A test goes in `crates/<crate>/tests/` unless it needs access to private items.
+
+Those integration tests link the crate the way a consumer does, so they only see
+the public API and they document it. Reach for a `#[cfg(test)] mod tests` inside
+`src/` only when the test genuinely calls a private function or inspects private
+state: `config.rs` exercises its migration helpers that way, and the Win32
+adapters do the same. A test that compiles from `tests/` belongs in `tests/`.
+
 Sign off each commit with `git commit -s` to record your agreement with the
 terms above.
