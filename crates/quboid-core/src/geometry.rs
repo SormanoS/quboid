@@ -187,6 +187,28 @@ impl LayoutEngine {
         target.is_valid().then_some(target)
     }
 
+    /// Expresses an absolute rectangle as the fraction of `work` it covers, the
+    /// inverse of `area_target`.
+    ///
+    /// A rectangle that reaches outside the work area is clamped to it, so what
+    /// comes back always describes a place on that monitor.
+    pub fn normalize(rect: Rect, work: Rect) -> Option<NormalizedRect> {
+        if !rect.is_valid() || !work.is_valid() {
+            return None;
+        }
+        let scale = i64::from(NORMALIZED_SCALE);
+        let fraction = |value: i32, origin: i32, span: i32| {
+            (i64::from(value - origin) * scale / i64::from(span)).clamp(0, scale) as u16
+        };
+        let bounds = NormalizedRect::new(
+            fraction(rect.left, work.left, work.width()),
+            fraction(rect.top, work.top, work.height()),
+            fraction(rect.right, work.left, work.width()),
+            fraction(rect.bottom, work.top, work.height()),
+        );
+        bounds.is_valid().then_some(bounds)
+    }
+
     pub fn map_to_monitor(current: Rect, from: Rect, to: Rect) -> Option<Rect> {
         if !current.is_valid() || !from.is_valid() || !to.is_valid() {
             return None;

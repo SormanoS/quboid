@@ -6,7 +6,7 @@ use std::{
     path::Path,
     sync::Mutex,
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
@@ -43,12 +43,13 @@ use windows::{
                 EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, GWL_EXSTYLE,
                 GetAncestor, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
                 GetWindowPlacement, GetWindowRect, GetWindowThreadProcessId, HWND_TOPMOST,
-                IsWindowVisible, LWA_ALPHA, PM_REMOVE, PeekMessageW, SET_WINDOW_POS_FLAGS, SW_HIDE,
-                SW_MAXIMIZE, SW_RESTORE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOZORDER,
-                SWP_SHOWWINDOW, SetLayeredWindowAttributes, SetWindowPlacement, SetWindowPos,
-                ShowWindow, TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WINDOWPLACEMENT,
-                WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_HOTKEY, WS_EX_LAYERED,
-                WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_POPUP,
+                IsIconic, IsWindow, IsWindowVisible, IsZoomed, LWA_ALPHA, PM_REMOVE, PeekMessageW,
+                SET_WINDOW_POS_FLAGS, SW_HIDE, SW_MAXIMIZE, SW_RESTORE, SW_SHOWNOACTIVATE,
+                SWP_NOACTIVATE, SWP_NOZORDER, SWP_SHOWWINDOW, SetLayeredWindowAttributes,
+                SetWindowPlacement, SetWindowPos, ShowWindow, TranslateMessage, WINDOW_EX_STYLE,
+                WINDOW_STYLE, WINDOWPLACEMENT, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
+                WM_HOTKEY, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
+                WS_POPUP,
             },
         },
     },
@@ -57,6 +58,14 @@ use windows::{
 
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 const MAX_APPLICATION_HOTKEY_ID: i32 = 0xBFFF;
+
+/// How often the monitor topology is read.
+const DISPLAY_POLL_INTERVAL: Duration = Duration::from_millis(500);
+
+/// How long that topology must stay unchanged before windows are put back.
+/// Docking, undocking and resolution changes arrive as a burst of intermediate
+/// arrangements, and acting on one of those would place windows twice.
+const DISPLAY_SETTLE_DELAY: Duration = Duration::from_secs(2);
 
 pub struct Runtime {
     commands: Sender<RuntimeCommand>,
@@ -151,6 +160,9 @@ fn run_message_loop(
         .flatten();
 
     let mut running = true;
+    let mut displays = config
+        .restore_on_display_change
+        .then(|| DisplayWatch::new(Instant::now()));
     while running {
         unsafe {
             while PeekMessageW(&mut message, None, 0, 0, PM_REMOVE).as_bool() {
@@ -176,6 +188,15 @@ fn run_message_loop(
             drag_snap.process_events(&mut windows, snap.as_mut());
         }
 
+        if let Some(displays) = &mut displays
+            && displays.settled(Instant::now())
+        {
+            let restored = windows.restore_arrangement();
+            if restored > 0 {
+                let _ = events.send(RuntimeEvent::ArrangementRestored { windows: restored });
+            }
+        }
+
         match commands.recv_timeout(POLL_INTERVAL) {
             Ok(RuntimeCommand::Apply(action)) => {
                 apply_and_report(action, &mut windows, &events);
@@ -198,6 +219,11 @@ fn run_message_loop(
                 Ok(()) => {
                     reconcile_hotkeys(&mut hotkeys, &updated, &events, !hotkeys_suspended);
                     windows.update_config(&updated);
+                    if !updated.restore_on_display_change {
+                        displays = None;
+                    } else if displays.is_none() {
+                        displays = Some(DisplayWatch::new(Instant::now()));
+                    }
                     drag_snap = None;
                     if updated.drag_snap_enabled {
                         match DragSnap::install(updated.clone()) {
@@ -404,6 +430,7 @@ fn apply_and_report(action: Action, windows: &mut WindowManager, events: &Sender
 
 struct WindowManager {
     placements: HashMap<usize, SavedPlacement>,
+    arrangements: HashMap<usize, TrackedArrangement>,
     gap: i32,
     filter: Box<dyn WindowFilter>,
 }
@@ -412,6 +439,7 @@ impl WindowManager {
     fn new(filter: Box<dyn WindowFilter>) -> Self {
         Self {
             placements: HashMap::new(),
+            arrangements: HashMap::new(),
             gap: 0,
             filter,
         }
@@ -433,6 +461,7 @@ impl WindowManager {
 
         let process_id = window_process_id(hwnd);
         if action == Action::Restore {
+            self.arrangements.remove(&(hwnd.0 as usize));
             if let Some(saved) = self.placements.remove(&(hwnd.0 as usize))
                 && saved.process_id == process_id
             {
@@ -449,6 +478,9 @@ impl WindowManager {
 
         self.remember_placement(hwnd, process_id)?;
         if action == Action::Maximize {
+            // A maximized window follows the monitor it is on, so nothing about
+            // its rectangle is worth putting back.
+            self.arrangements.remove(&(hwnd.0 as usize));
             unsafe {
                 let _ = ShowWindow(hwnd, SW_MAXIMIZE);
             }
@@ -505,6 +537,7 @@ impl WindowManager {
                 SET_WINDOW_POS_FLAGS(SWP_NOACTIVATE.0 | SWP_NOZORDER.0),
             )?;
         }
+        self.track_arrangement(hwnd, process_id, target, &monitors);
         debug!(
             ?action,
             ?target,
@@ -520,20 +553,79 @@ impl WindowManager {
         }
         let process_id = window_process_id(hwnd);
         self.remember_placement(hwnd, process_id)?;
-        let geometry = window_geometry(hwnd)?;
-        let outer_target = geometry.outer_for_visible(target);
-        unsafe {
-            SetWindowPos(
-                hwnd,
-                None,
-                outer_target.left,
-                outer_target.top,
-                outer_target.width(),
-                outer_target.height(),
-                SET_WINDOW_POS_FLAGS(SWP_NOACTIVATE.0 | SWP_NOZORDER.0),
-            )?;
+        place_window(hwnd, target)?;
+        if let Ok(monitors) = enumerate_monitors() {
+            self.track_arrangement(hwnd, process_id, target, &monitors);
         }
         Ok(())
+    }
+
+    /// Remembers where a window was put, as the fraction of a named monitor's
+    /// work area it covers. That is what survives the monitor going away and
+    /// coming back, possibly at another resolution or scale.
+    fn track_arrangement(
+        &mut self,
+        hwnd: HWND,
+        process_id: u32,
+        target: Rect,
+        monitors: &[Monitor],
+    ) {
+        let Ok(index) = select_monitor(target, hwnd, monitors) else {
+            return;
+        };
+        let monitor = &monitors[index];
+        if let Some(bounds) = LayoutEngine::normalize(target, monitor.work) {
+            self.arrangements.insert(
+                hwnd.0 as usize,
+                TrackedArrangement {
+                    process_id,
+                    monitor: monitor.device_name(),
+                    bounds,
+                },
+            );
+        }
+    }
+
+    /// Forgets where a window was put, after something other than Quboid
+    /// decided where it belongs.
+    fn forget_arrangement(&mut self, hwnd: HWND) {
+        self.arrangements.remove(&(hwnd.0 as usize));
+    }
+
+    /// Puts every window Quboid placed back on the monitor it was placed on,
+    /// covering the same fraction of its work area.
+    ///
+    /// Windows that closed in the meantime are forgotten here, which is also
+    /// what keeps the two maps from growing for as long as the process lives.
+    fn restore_arrangement(&mut self) -> usize {
+        let Ok(monitors) = enumerate_monitors() else {
+            return 0;
+        };
+
+        let mut restored = 0;
+        for (key, arrangement) in std::mem::take(&mut self.arrangements) {
+            let hwnd = HWND(key as *mut core::ffi::c_void);
+            if !unsafe { IsWindow(Some(hwnd)) }.as_bool()
+                || window_process_id(hwnd) != arrangement.process_id
+            {
+                self.placements.remove(&key);
+                continue;
+            }
+
+            if let Some(monitor) = monitors
+                .iter()
+                .find(|monitor| monitor.device_name() == arrangement.monitor)
+                && is_restorable_window(hwnd)
+                && self.is_eligible(hwnd)
+                && let Some(target) = LayoutEngine::area_target(arrangement.bounds, monitor.work)
+                && place_window(hwnd, target).is_ok()
+            {
+                restored += 1;
+                debug!(?target, monitor = %arrangement.monitor, "restored window after a display change");
+            }
+            self.arrangements.insert(key, arrangement);
+        }
+        restored
     }
 
     fn apply_area(&mut self, bounds: NormalizedRect) -> Result<Rect, ApplyError> {
@@ -582,6 +674,97 @@ impl WindowManager {
 struct SavedPlacement {
     process_id: u32,
     placement: WINDOWPLACEMENT,
+}
+
+/// Where a window was put, in terms that outlive the monitor it was put on.
+struct TrackedArrangement {
+    process_id: u32,
+    /// The display device the window was placed on, such as `\\.\DISPLAY1`.
+    monitor: String,
+    bounds: NormalizedRect,
+}
+
+/// Watches the monitor topology and reports a change once it has settled.
+struct DisplayWatch {
+    signature: Vec<(String, Rect)>,
+    next_poll: Instant,
+    settles_at: Option<Instant>,
+}
+
+impl DisplayWatch {
+    fn new(now: Instant) -> Self {
+        Self {
+            signature: display_signature(),
+            next_poll: now + DISPLAY_POLL_INTERVAL,
+            settles_at: None,
+        }
+    }
+
+    /// Whether the monitors changed and have since stayed the same long enough
+    /// to act on. Work areas are part of what is watched, so a resolution or a
+    /// taskbar change counts just as much as a monitor appearing.
+    fn settled(&mut self, now: Instant) -> bool {
+        if now < self.next_poll {
+            return false;
+        }
+        self.next_poll = now + DISPLAY_POLL_INTERVAL;
+        self.observe(display_signature(), now)
+    }
+
+    fn observe(&mut self, signature: Vec<(String, Rect)>, now: Instant) -> bool {
+        if signature.is_empty() {
+            // Enumeration failed, or the session has no desktop to read: saying
+            // the monitors changed would move windows onto a guess.
+            return false;
+        }
+        if signature != self.signature {
+            self.signature = signature;
+            self.settles_at = Some(now + DISPLAY_SETTLE_DELAY);
+            return false;
+        }
+        match self.settles_at {
+            Some(deadline) if now >= deadline => {
+                self.settles_at = None;
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+fn display_signature() -> Vec<(String, Rect)> {
+    enumerate_monitors()
+        .map(|monitors| {
+            monitors
+                .iter()
+                .map(|monitor| (monitor.device_name(), monitor.work))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Moves and sizes a window so that its visible frame covers `target`.
+fn place_window(hwnd: HWND, target: Rect) -> Result<(), ApplyError> {
+    let outer_target = window_geometry(hwnd)?.outer_for_visible(target);
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            None,
+            outer_target.left,
+            outer_target.top,
+            outer_target.width(),
+            outer_target.height(),
+            SET_WINDOW_POS_FLAGS(SWP_NOACTIVATE.0 | SWP_NOZORDER.0),
+        )?;
+    }
+    Ok(())
+}
+
+/// Whether a remembered rectangle still describes the window. A minimized or
+/// maximized window has a state of its own that Windows restores, and forcing a
+/// rectangle on it would take that state away.
+fn is_restorable_window(hwnd: HWND) -> bool {
+    unsafe { !IsIconic(hwnd).as_bool() && !IsZoomed(hwnd).as_bool() }
 }
 
 #[derive(Clone, Copy)]
@@ -892,10 +1075,18 @@ impl DragSnap {
                     self.overlay.hide();
                     if let Some(session) = self.session.take()
                         && session.hwnd == hwnd
-                        && let Some(target) = session.target
-                        && let Err(error) = windows.snap_dragged_window(hwnd, target)
                     {
-                        error!(%error, "failed to snap dragged window");
+                        match session.target {
+                            Some(target) => {
+                                if let Err(error) = windows.snap_dragged_window(hwnd, target) {
+                                    error!(%error, "failed to snap dragged window");
+                                }
+                            }
+                            // The user moved or sized the window themselves, so
+                            // the rectangle Quboid remembers is not the one they
+                            // would want back after a display change.
+                            None => windows.forget_arrangement(hwnd),
+                        }
                     }
                 }
                 _ => {}
@@ -1054,4 +1245,63 @@ fn snap_target_at_cursor(
         snap_threshold: config.snap_threshold,
         application,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn signature(work: Rect) -> Vec<(String, Rect)> {
+        vec![(r"\\.\DISPLAY1".to_owned(), work)]
+    }
+
+    #[test]
+    fn a_display_change_is_reported_once_it_stops_changing() {
+        let start = Instant::now();
+        let mut watch = DisplayWatch {
+            signature: signature(Rect::new(0, 0, 1920, 1040)),
+            next_poll: start,
+            settles_at: None,
+        };
+
+        let docked = signature(Rect::new(0, 0, 3840, 2120));
+        assert!(!watch.observe(docked.clone(), start));
+        assert!(!watch.observe(docked.clone(), start + DISPLAY_SETTLE_DELAY / 2));
+        assert!(watch.observe(docked.clone(), start + DISPLAY_SETTLE_DELAY));
+        assert!(!watch.observe(docked, start + DISPLAY_SETTLE_DELAY * 2));
+    }
+
+    #[test]
+    fn a_burst_of_changes_restarts_the_wait() {
+        let start = Instant::now();
+        let mut watch = DisplayWatch {
+            signature: signature(Rect::new(0, 0, 1920, 1040)),
+            next_poll: start,
+            settles_at: None,
+        };
+
+        assert!(!watch.observe(signature(Rect::new(0, 0, 2560, 1400)), start));
+        let settled = signature(Rect::new(0, 0, 3840, 2120));
+        assert!(!watch.observe(settled.clone(), start + DISPLAY_SETTLE_DELAY));
+        assert!(!watch.observe(
+            settled.clone(),
+            start + DISPLAY_SETTLE_DELAY + DISPLAY_SETTLE_DELAY / 2
+        ));
+        assert!(watch.observe(settled, start + DISPLAY_SETTLE_DELAY * 2));
+    }
+
+    #[test]
+    fn an_unreadable_desktop_is_not_a_display_change() {
+        let start = Instant::now();
+        let work = Rect::new(0, 0, 1920, 1040);
+        let mut watch = DisplayWatch {
+            signature: signature(work),
+            next_poll: start,
+            settles_at: None,
+        };
+
+        assert!(!watch.observe(Vec::new(), start));
+        assert_eq!(watch.signature, signature(work));
+        assert!(watch.settles_at.is_none());
+    }
 }

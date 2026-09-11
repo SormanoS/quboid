@@ -38,6 +38,8 @@ it from controlling elevated windows.
 
 - Halves, thirds, quarters, centering, resizing and incremental movement
 - Movement between monitors with negative-coordinate and mixed-DPI support
+- Windows put back where they were when the monitors change, as after a dock or
+  an undock
 - Configurable global shortcuts, one action per shortcut
 - Edge and corner drag snapping with a non-interactive overlay
 - Italian and English interface, picked from the Windows user locale on first run, tray mode and launch at login
@@ -68,6 +70,19 @@ whether its change is still in progress or ready to be written, so continuous
 edits stay visible to the runtime without rewriting the document on every frame.
 `quboid_app::run` accepts a `Profile` (storage, runtime adapters and optional
 extra pages), so a host can reuse the whole application shell.
+
+## Displays that come and go
+
+Every window Quboid places is remembered as the fraction of a named display's
+work area it covers. When the monitors change — a dock, an undock, a resolution
+or a scale change — Quboid waits for the topology to stop changing and puts
+those windows back on the display they were on, at the same fraction of its new
+work area. Windows the user minimized, maximized or closed in the meantime are
+left alone, and nothing the user placed by hand is touched. The setting is
+`restore_on_display_change`, on by default.
+
+Displays are matched by device name, so a monitor that Windows renumbers is
+treated as a different one and its windows simply stay where they are.
 
 ## Configuration
 
