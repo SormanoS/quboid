@@ -230,11 +230,22 @@ The submission needs five repository secrets — `STORE_PRODUCT_ID`,
 `STORE_TENANT_ID`, `STORE_SELLER_ID`, `STORE_CLIENT_ID` and
 `STORE_CLIENT_SECRET` — obtained from Partner Center and a Microsoft Entra ID
 application holding the Manager role on the account. With none of them set the
-job reports a skip instead of failing, so a fork releases without them. Partner
-Center still owns what no API can create: the reserved name, the listing and the
-first submission are done by hand once, and every tag after that ships on its
-own. Certification itself is asynchronous, so the job waits on the outcome and
-fails if Microsoft rejects the package.
+job reports a skip instead of failing, so a fork releases without them. Setting
+only some of them fails the release instead: a secret that exists but is empty
+counts as missing, which is the likeliest way to break a release that worked
+before. Partner Center still owns what no API can create: the reserved name, the
+listing and the first submission are done by hand once, and every tag after that
+ships on its own. Certification itself is asynchronous, so the job waits on the
+outcome and fails if Microsoft rejects the package.
+
+`STORE_CLIENT_SECRET` expires on the date chosen when it was created in Entra,
+and releases fail to authenticate from that day on. Issuing a new secret on the
+same application and updating the repository secret is the whole fix; nothing
+else needs to change.
+
+Releases are immutable, so deleting one does not free its tag name: the name is
+burned and that version can never be released again. A release published by
+mistake is superseded by the next patch rather than replaced.
 
 ## License
 
