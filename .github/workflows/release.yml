@@ -2,11 +2,18 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    # Version tags carry no prefix, so the filter has to be specific enough to
+    # ignore every other tag. The trailing wildcard keeps prerelease tags such
+    # as 0.2.0-rc.1 triggering: they produce a release but never reach the
+    # Store, which the store output below decides.
+    tags: ["[0-9]+.[0-9]+.[0-9]+*"]
   workflow_dispatch:
     inputs:
       version:
-        description: The version to package, without the leading v.
+        description: >-
+          The version to rehearse, matching Cargo.toml. A manual run builds,
+          packages and verifies everything but publishes nothing, so the
+          pipeline can be exercised without spending a version.
         required: true
 
 permissions:
@@ -53,7 +60,7 @@ jobs:
               "${{ inputs.version }}"
           }
           else {
-              "${{ github.ref_name }}" -replace "^v", ""
+              "${{ github.ref_name }}"
           }
           if ($Requested -ne $Manifested) {
               throw "Requested version $Requested does not match Cargo.toml version $Manifested."
@@ -62,9 +69,12 @@ jobs:
 
           # An MSIX identity is major.minor.patch.0, so a prerelease version has
           # no package the Store would accept. Such a tag still produces a
-          # GitHub release; it just stops before the Store.
-          $Store = if ($Manifested -match '^\d+\.\d+\.\d+$') { "true" } else { "false" }
+          # GitHub release; it just stops before the Store. A manual run
+          # publishes nothing at all, since it has no tag to release against.
+          $Tagged = "${{ github.event_name }}" -eq "push"
+          $Store = if ($Tagged -and $Manifested -match '^\d+\.\d+\.\d+$') { "true" } else { "false" }
           "store=$Store" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+          "tagged=$($Tagged.ToString().ToLower())" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
 
       - name: Build the release executable
         run: cargo build --locked --release --target x86_64-pc-windows-msvc
@@ -105,6 +115,7 @@ jobs:
       # The .wixpdb WiX leaves in dist holds installer debug symbols and is
       # deliberately left out of the published files.
       - name: Publish the release
+        if: steps.version.outputs.tagged == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -119,7 +130,7 @@ jobs:
 
           These binaries are unsigned, so Windows SmartScreen warns the first time you run them.
           "@
-          gh release create "v$env:VERSION" `
+          gh release create "$env:VERSION" `
             "dist/Quboid-$env:VERSION-windows-x64.msi" `
             "dist/Quboid-$env:VERSION-windows-x64-portable.zip" `
             "dist/SHA256SUMS.txt" `

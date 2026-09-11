@@ -208,14 +208,20 @@ release build, the Windows end-to-end test, packaging and these checks.
 
 ### Releasing
 
-Pushing a `vX.Y.Z` tag runs `.github\workflows\release.yml`, which refuses to go
+Pushing an `X.Y.Z` tag runs `.github\workflows\release.yml`, which refuses to go
 on unless the tag matches the version in `Cargo.toml`, then publishes the MSI,
 the portable archive and the checksums as a GitHub release and submits the MSIX
-to the Microsoft Store.
+to the Microsoft Store. Tags carry no `v` prefix, so the tag and the version in
+`Cargo.toml` are the same string.
+
+Running the workflow by hand from the Actions tab rehearses all of that without
+publishing anything: it builds, packages and verifies, and stops short of the
+release and the submission. Nothing creates a tag, so there is no way to spend a
+version by accident.
 
 `Cargo.toml` is the only place a version is written. The MSIX identity derives
 from it as `X.Y.Z.0`: the fourth part belongs to the Store and stays zero, which
-is why a prerelease tag such as `v1.0.0-rc.1` produces a GitHub release but no
+is why a prerelease tag such as `1.0.0-rc.1` produces a GitHub release but no
 Store submission. The Store also rejects a package that does not outrank the
 published one, so a submission that fails certification cannot be retried under
 the same version; the fix ships as a new patch release.
