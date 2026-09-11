@@ -23,7 +23,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       store: ${{ steps.version.outputs.store }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -86,14 +86,14 @@ jobs:
 
       - name: Upload the MSIX
         if: steps.version.outputs.store == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quboid-${{ steps.version.outputs.version }}-msix
           if-no-files-found: error
           path: dist/*.msix
 
       - name: Upload the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quboid-${{ steps.version.outputs.version }}-windows-x64
           if-no-files-found: error
@@ -141,7 +141,7 @@ jobs:
     if: needs.release.outputs.store == 'true'
     runs-on: windows-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: quboid-${{ needs.release.outputs.version }}-msix
           path: dist
