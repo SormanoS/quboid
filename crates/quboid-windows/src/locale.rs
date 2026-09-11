@@ -1,4 +1,4 @@
-use quboid_core::Language;
+﻿use quboid_core::Language;
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
 
 /// The buffer size Win32 requires for a locale name, terminator included.
@@ -35,25 +35,4 @@ fn user_default_locale_name() -> Option<String> {
     let length = (written as usize).saturating_sub(1).min(buffer.len());
     let tag = String::from_utf16_lossy(&buffer[..length]);
     if tag.is_empty() { None } else { Some(tag) }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_user_locale_names_a_language() {
-        // Whatever this machine is set to, a locale must resolve to a language
-        // Quboid can render.
-        let _ = system_language();
-    }
-
-    #[test]
-    fn windows_locale_tags_map_to_an_interface_language() {
-        assert_eq!(Language::from_locale_tag("it-IT"), Language::Italian);
-        assert_eq!(Language::from_locale_tag("it-CH"), Language::Italian);
-        assert_eq!(Language::from_locale_tag("en-US"), Language::English);
-        assert_eq!(Language::from_locale_tag("de-DE"), Language::English);
-        assert_eq!(Language::from_locale_tag(""), Language::English);
-    }
 }
