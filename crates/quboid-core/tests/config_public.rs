@@ -402,3 +402,27 @@ fn suffixed(path: &Path, suffix: &str) -> std::path::PathBuf {
     name.push(suffix);
     name.into()
 }
+
+#[test]
+fn version_four_document_gains_the_display_change_setting() {
+    let storage = PortableConfigAdapter::new("unused");
+    let version_four = br#"{
+        "schema_version": 4,
+        "language": "english",
+        "launch_at_login": false,
+        "drag_snap_enabled": true,
+        "hotkeys": [],
+        "gap": 12,
+        "snap_threshold": 640
+    }"#;
+
+    let imported = storage.import(version_four).unwrap();
+
+    assert_eq!(
+        imported.config.schema_version,
+        quboid_core::CURRENT_SCHEMA_VERSION
+    );
+    assert!(imported.config.restore_on_display_change);
+    assert_eq!(imported.config.gap, 12);
+    assert!(imported.discarded_sections.is_empty());
+}

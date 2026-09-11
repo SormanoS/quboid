@@ -226,6 +226,14 @@ impl UiState {
             RuntimeEvent::AreaApplied { .. } => {
                 text(self.config.language, "Area applicata", "Area applied").to_owned()
             }
+            RuntimeEvent::ArrangementRestored { windows } => format!(
+                "{}: {windows}",
+                text(
+                    self.config.language,
+                    "Finestre ripristinate dopo il cambio schermo",
+                    "Windows restored after the display change"
+                )
+            ),
             RuntimeEvent::HotkeyConflict { action } => format!(
                 "{}: {}",
                 text(
@@ -781,6 +789,15 @@ impl UiState {
                     ui.label(text(language, "Soglia snap", "Snap threshold"));
                     changed |=
                         setting_slider(ui, &mut self.config.snap_threshold, 100..=1_500, " /10000");
+                    ui.end_row();
+
+                    ui.label(text(language, "Cambio schermo", "Display change"));
+                    changed |= ui
+                        .checkbox(
+                            &mut self.config.restore_on_display_change,
+                            text(language, "Ripristina le finestre", "Restore windows"),
+                        )
+                        .changed();
                     ui.end_row();
 
                     ui.label(text(language, "Avvio automatico", "Launch at login"));
