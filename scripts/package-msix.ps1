@@ -55,12 +55,13 @@ try {
     }
 
     # MSIX versions are always four parts and the revision must be zero for
-    # packages submitted to the Store.
-    $Parts = $Version.Split(".")
-    if ($Parts.Count -lt 3) {
+    # packages submitted to the Store. A prerelease suffix has no place in that
+    # shape, so versions like 1.0.0-rc.1 are refused rather than silently
+    # truncated into a package the Store would reject.
+    if ($Version -notmatch '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$') {
         throw "Version $Version is not major.minor.patch."
     }
-    $PackageVersion = "$($Parts[0]).$($Parts[1]).$($Parts[2]).0"
+    $PackageVersion = "$($Matches.major).$($Matches.minor).$($Matches.patch).0"
 
     if (-not $SkipBuild) {
         cargo build --locked --release --target $Target
