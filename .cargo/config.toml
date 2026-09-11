@@ -1,0 +1,6 @@
+# The MSVC CRT is linked statically so the executable does not import
+# VCRUNTIME140.dll. A dynamic CRT makes the Visual C++ Redistributable a
+# non-integrated dependency, which the Microsoft Store rejects unless it is
+# declared in the first two lines of the Store description.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
