@@ -189,3 +189,25 @@ proptest! {
         }
     }
 }
+
+#[test]
+fn the_gap_keeps_its_size_on_a_scaled_display() {
+    assert_eq!(LayoutEngine::gap_pixels(12, 96), 12);
+    assert_eq!(LayoutEngine::gap_pixels(12, 120), 15);
+    assert_eq!(LayoutEngine::gap_pixels(12, 144), 18);
+    assert_eq!(LayoutEngine::gap_pixels(12, 192), 24);
+    assert_eq!(LayoutEngine::gap_pixels(0, 192), 0);
+}
+
+#[test]
+fn an_unreported_dpi_leaves_the_gap_at_its_configured_size() {
+    assert_eq!(LayoutEngine::gap_pixels(12, 0), 12);
+}
+
+#[test]
+fn the_gap_is_capped_before_it_is_scaled() {
+    assert_eq!(
+        LayoutEngine::gap_pixels(u16::MAX, 192),
+        LayoutEngine::gap_pixels(quboid_core::MAX_GAP, 192)
+    );
+}
