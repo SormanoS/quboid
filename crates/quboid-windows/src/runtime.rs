@@ -11,7 +11,8 @@ use std::{
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use quboid_core::{
-    Action, AppConfig, LayoutEngine, NormalizedRect, Point, Rect, RuntimeCommand, RuntimeEvent,
+    Action, AppConfig, LayoutEngine, MAX_GAP, NormalizedRect, Point, Rect, RuntimeCommand,
+    RuntimeEvent, USER_DEFAULT_SCREEN_DPI,
 };
 use thiserror::Error;
 use tracing::{debug, error};
@@ -34,7 +35,10 @@ use windows::{
         },
         UI::{
             Accessibility::{HWINEVENTHOOK, SetWinEventHook, UnhookWinEvent},
-            HiDpi::{DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetThreadDpiAwarenessContext},
+            HiDpi::{
+                DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForMonitor, MDT_EFFECTIVE_DPI,
+                SetThreadDpiAwarenessContext,
+            },
             Input::KeyboardAndMouse::{
                 HOT_KEY_MODIFIERS, MOD_NOREPEAT, RegisterHotKey, UnregisterHotKey,
             },
@@ -404,7 +408,9 @@ fn apply_and_report(action: Action, windows: &mut WindowManager, events: &Sender
 
 struct WindowManager {
     placements: HashMap<usize, SavedPlacement>,
-    gap: i32,
+    /// The configured gap at 100%: what it comes to in pixels depends on the
+    /// monitor the window lands on.
+    gap: u16,
     filter: Box<dyn WindowFilter>,
 }
 
@@ -418,7 +424,7 @@ impl WindowManager {
     }
 
     fn update_config(&mut self, config: &AppConfig) {
-        self.gap = i32::from(config.gap.min(64));
+        self.gap = config.gap.min(MAX_GAP);
     }
 
     fn is_eligible(&self, hwnd: HWND) -> bool {
@@ -489,7 +495,10 @@ impl WindowManager {
             | Action::MoveDown
             | Action::NextMonitor
             | Action::PreviousMonitor => target,
-            _ => target.inset(self.gap),
+            _ => target.inset(LayoutEngine::gap_pixels(
+                self.gap,
+                monitors[monitor_index].dpi,
+            )),
         };
 
         let outer_target = geometry.outer_for_visible(target);
@@ -546,7 +555,10 @@ impl WindowManager {
         let monitor_index = select_monitor(geometry.visible, hwnd, &monitors)?;
         let target = LayoutEngine::area_target(bounds, monitors[monitor_index].work)
             .ok_or(ApplyError::InvalidArea)?
-            .inset(self.gap);
+            .inset(LayoutEngine::gap_pixels(
+                self.gap,
+                monitors[monitor_index].dpi,
+            ));
         self.snap_dragged_window(hwnd, target)?;
         Ok(target)
     }
@@ -697,6 +709,8 @@ fn window_application(hwnd: HWND) -> Option<String> {
 struct Monitor {
     handle: HMONITOR,
     work: Rect,
+    /// Effective DPI, which is what the display's scale comes to.
+    dpi: u32,
     device_name: [u16; 32],
 }
 
@@ -772,9 +786,21 @@ unsafe extern "system" fn collect_monitor(
                 info.monitorInfo.rcWork.bottom,
             ),
             device_name: info.szDevice,
+            dpi: monitor_dpi(monitor),
         });
     }
     BOOL(1)
+}
+
+/// The effective DPI of a monitor, falling back to 100% when Windows will not
+/// say: a wrong gap is better than no placement.
+fn monitor_dpi(monitor: HMONITOR) -> u32 {
+    let mut horizontal = 0;
+    let mut vertical = 0;
+    match unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut horizontal, &mut vertical) } {
+        Ok(()) if horizontal > 0 => horizontal,
+        _ => USER_DEFAULT_SCREEN_DPI,
+    }
 }
 
 #[derive(Debug, Error)]
@@ -1031,26 +1057,22 @@ fn snap_target_at_cursor(
     }
     let cursor = Point::new(cursor.x, cursor.y);
     let monitors = enumerate_monitors()?;
-    let work = monitors
+    let monitor = monitors
         .iter()
-        .map(|monitor| monitor.work)
-        .find(|work| work.contains(cursor))
+        .find(|monitor| monitor.work.contains(cursor))
         .or_else(|| {
-            monitors
-                .iter()
-                .min_by_key(|monitor| {
-                    let center_x = monitor.work.left + monitor.work.width() / 2;
-                    let center_y = monitor.work.top + monitor.work.height() / 2;
-                    i64::from((cursor.x - center_x).abs()) + i64::from((cursor.y - center_y).abs())
-                })
-                .map(|monitor| monitor.work)
+            monitors.iter().min_by_key(|monitor| {
+                let center_x = monitor.work.left + monitor.work.width() / 2;
+                let center_y = monitor.work.top + monitor.work.height() / 2;
+                i64::from((cursor.x - center_x).abs()) + i64::from((cursor.y - center_y).abs())
+            })
         })
         .ok_or(ApplyError::NoMonitor)?;
 
     Ok(snap.snap_target(SnapRequest {
         cursor,
-        work_area: work,
-        gap: i32::from(config.gap.min(64)),
+        work_area: monitor.work,
+        gap: LayoutEngine::gap_pixels(config.gap, monitor.dpi),
         snap_threshold: config.snap_threshold,
         application,
     }))

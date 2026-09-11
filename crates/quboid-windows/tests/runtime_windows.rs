@@ -8,8 +8,8 @@ use std::{
 };
 
 use quboid_core::{
-    Action, AppConfig, ConfigError, HotkeyBinding, Language, NormalizedRect, Rect, RuntimeCommand,
-    RuntimeEvent,
+    Action, AppConfig, ConfigError, HotkeyBinding, Language, LayoutEngine, NormalizedRect, Rect,
+    RuntimeCommand, RuntimeEvent,
 };
 use quboid_windows::{
     Runtime, RuntimeAdapters, RuntimeError, WindowFilter, set_launch_at_login, system_language,
@@ -24,7 +24,10 @@ use windows::{
         },
         System::Threading::{AttachThreadInput, GetCurrentThreadId},
         UI::{
-            HiDpi::{DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext},
+            HiDpi::{
+                DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForMonitor, MDT_EFFECTIVE_DPI,
+                SetProcessDpiAwarenessContext,
+            },
             Input::KeyboardAndMouse::{SetActiveWindow, SetFocus},
             WindowsAndMessaging::{
                 BringWindowToTop, CreateWindowExW, DestroyWindow, DispatchMessageW,
@@ -123,11 +126,14 @@ fn configured_area_is_applied_with_the_configured_gap() {
     let window = TestWindow::new();
     window.make_foreground();
     let work = window.work_area();
+    // The setting is a size at 100%, so the pixels it comes to depend on what
+    // the monitor running the test is scaled to.
+    let gap = LayoutEngine::gap_pixels(12, window.dpi());
     let expected = Rect::new(
-        work.left + work.width() / 4 + 12,
-        work.top + work.height() / 4 + 12,
-        work.left + work.width() * 3 / 4 - 12,
-        work.top + work.height() * 3 / 4 - 12,
+        work.left + work.width() / 4 + gap,
+        work.top + work.height() / 4 + gap,
+        work.left + work.width() * 3 / 4 - gap,
+        work.top + work.height() * 3 / 4 - gap,
     );
 
     runtime
@@ -592,6 +598,15 @@ impl TestWindow {
             info.rcWork.right,
             info.rcWork.bottom,
         )
+    }
+
+    fn dpi(&self) -> u32 {
+        let monitor = unsafe { MonitorFromWindow(self.hwnd, MONITOR_DEFAULTTONEAREST) };
+        let mut horizontal = 0;
+        let mut vertical = 0;
+        unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut horizontal, &mut vertical) }
+            .unwrap();
+        horizontal
     }
 
     fn visible_rect(&self) -> Rect {

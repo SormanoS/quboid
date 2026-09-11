@@ -10,4 +10,6 @@ pub use config::{
     import_value, parse_document, read_document, schema_version, serialize_document,
     unsupported_sections_path, write_document,
 };
-pub use geometry::{LayoutEngine, NORMALIZED_SCALE, NormalizedRect, Point, Rect};
+pub use geometry::{
+    LayoutEngine, MAX_GAP, NORMALIZED_SCALE, NormalizedRect, Point, Rect, USER_DEFAULT_SCREEN_DPI,
+};
