@@ -26,7 +26,7 @@ jobs:
     name: Format, lint and test
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -54,7 +54,7 @@ jobs:
     runs-on: windows-latest
     needs: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -91,7 +91,7 @@ jobs:
         run: .\scripts\test-packaging.ps1 -Version ${{ steps.version.outputs.version }}
 
       - name: Upload the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quboid-${{ steps.version.outputs.version }}-windows-x64
           if-no-files-found: error
@@ -109,7 +109,7 @@ jobs:
     # limitation of the runner rather than a defect in Quboid.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
