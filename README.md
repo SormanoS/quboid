@@ -37,6 +37,7 @@ it from controlling elevated windows.
 ## Features
 
 - Halves, thirds, quarters, centering, resizing and incremental movement
+- Undo, which takes back the last placement one step at a time
 - Movement between monitors with negative-coordinate and mixed-DPI support
 - Windows put back where they were when the monitors change, as after a dock or
   an undock

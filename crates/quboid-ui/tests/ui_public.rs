@@ -27,6 +27,15 @@ fn action_button_emits_apply_intent() {
 }
 
 #[test]
+fn undo_is_reachable_as_a_named_action_card() {
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let harness = ui_harness(&state, &intents);
+
+    let _card = harness.get_by_label("Annulla spostamento");
+}
+
+#[test]
 fn rectangle_action_cards_expose_new_standard_layouts() {
     let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
@@ -131,7 +140,7 @@ fn shortcut_editor_adds_a_valid_binding() {
     assert!(intents.borrow().iter().any(|intent| {
         matches!(
             intent,
-            UiIntent::Save(config) if config.hotkeys.len() == 23 && config.validate().is_ok()
+            UiIntent::Save(config) if config.hotkeys.len() == 24 && config.validate().is_ok()
         )
     }));
 }
