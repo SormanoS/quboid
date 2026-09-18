@@ -182,6 +182,7 @@ impl LayoutEngine {
             Action::MoveDown => Self::translate(current, work, 0, work.height() / 20),
             Action::Maximize
             | Action::Restore
+            | Action::Undo
             | Action::NextMonitor
             | Action::PreviousMonitor
             | Action::ShowShortcuts => {

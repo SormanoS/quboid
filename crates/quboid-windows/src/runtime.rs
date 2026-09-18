@@ -71,6 +71,15 @@ const DISPLAY_POLL_INTERVAL: Duration = Duration::from_millis(500);
 /// arrangements, and acting on one of those would place windows twice.
 const DISPLAY_SETTLE_DELAY: Duration = Duration::from_secs(2);
 
+/// How many placements a single window remembers, so that undoing stays bounded
+/// however long a window is moved around.
+const MAX_UNDO_DEPTH: usize = 16;
+
+/// How many windows keep an undo history before the ones that closed are
+/// dropped. Handles are only checked when this many have accumulated, so the
+/// common case costs nothing.
+const UNDO_WINDOW_LIMIT: usize = 64;
+
 pub struct Runtime {
     commands: Sender<RuntimeCommand>,
     events: Receiver<RuntimeEvent>,
@@ -441,6 +450,7 @@ fn apply_and_report(action: Action, windows: &mut WindowManager, events: &Sender
 struct WindowManager {
     placements: HashMap<usize, SavedPlacement>,
     arrangements: HashMap<usize, TrackedArrangement>,
+    undo: HashMap<usize, UndoStack>,
     /// The configured gap at 100%: what it comes to in pixels depends on the
     /// monitor the window lands on.
     gap: u16,
@@ -452,6 +462,7 @@ impl WindowManager {
         Self {
             placements: HashMap::new(),
             arrangements: HashMap::new(),
+            undo: HashMap::new(),
             gap: 0,
             filter,
         }
@@ -472,7 +483,11 @@ impl WindowManager {
         }
 
         let process_id = window_process_id(hwnd);
+        if action == Action::Undo {
+            return self.undo(hwnd, process_id);
+        }
         if action == Action::Restore {
+            self.push_undo(hwnd, process_id)?;
             self.arrangements.remove(&(hwnd.0 as usize));
             if let Some(saved) = self.placements.remove(&(hwnd.0 as usize))
                 && saved.process_id == process_id
@@ -492,6 +507,7 @@ impl WindowManager {
         if action == Action::Maximize {
             // A maximized window follows the monitor it is on, so nothing about
             // its rectangle is worth putting back.
+            self.push_undo(hwnd, process_id)?;
             self.arrangements.remove(&(hwnd.0 as usize));
             unsafe {
                 let _ = ShowWindow(hwnd, SW_MAXIMIZE);
@@ -540,6 +556,7 @@ impl WindowManager {
         };
 
         let outer_target = geometry.outer_for_visible(target);
+        self.push_undo(hwnd, process_id)?;
         unsafe {
             let _ = ShowWindow(hwnd, SW_RESTORE);
             SetWindowPos(
@@ -568,6 +585,7 @@ impl WindowManager {
         }
         let process_id = window_process_id(hwnd);
         self.remember_placement(hwnd, process_id)?;
+        self.push_undo(hwnd, process_id)?;
         place_window(hwnd, target)?;
         if let Ok(monitors) = enumerate_monitors() {
             self.track_arrangement(hwnd, process_id, target, &monitors);
@@ -624,6 +642,7 @@ impl WindowManager {
                 || window_process_id(hwnd) != arrangement.process_id
             {
                 self.placements.remove(&key);
+                self.undo.remove(&key);
                 continue;
             }
 
@@ -671,13 +690,7 @@ impl WindowManager {
             return Ok(());
         }
 
-        let mut placement = WINDOWPLACEMENT {
-            length: size_of::<WINDOWPLACEMENT>() as u32,
-            ..Default::default()
-        };
-        unsafe {
-            GetWindowPlacement(hwnd, &mut placement)?;
-        }
+        let placement = window_placement(hwnd)?;
         self.placements.insert(
             key,
             SavedPlacement {
@@ -687,11 +700,92 @@ impl WindowManager {
         );
         Ok(())
     }
+
+    /// Remembers where a window is right now, so that the placement about to be
+    /// made can be taken back.
+    ///
+    /// A `WINDOWPLACEMENT` is what gets kept rather than a rectangle, because it
+    /// also carries whether the window was maximized or minimized: undoing a
+    /// maximize has to give back a maximized window, not one the size of the
+    /// screen.
+    fn push_undo(&mut self, hwnd: HWND, process_id: u32) -> Result<(), ApplyError> {
+        let placement = window_placement(hwnd)?;
+        let key = hwnd.0 as usize;
+        if self.undo.len() >= UNDO_WINDOW_LIMIT && !self.undo.contains_key(&key) {
+            self.undo.retain(|key, stack| {
+                let hwnd = HWND(*key as *mut core::ffi::c_void);
+                unsafe { IsWindow(Some(hwnd)) }.as_bool()
+                    && window_process_id(hwnd) == stack.process_id
+            });
+        }
+
+        let stack = self.undo.entry(key).or_insert_with(|| UndoStack {
+            process_id,
+            placements: Vec::new(),
+        });
+        // Windows reuses handles, so a different process behind the same handle
+        // means this history describes a window that is gone.
+        if stack.process_id != process_id {
+            stack.process_id = process_id;
+            stack.placements.clear();
+        }
+        if stack.placements.len() == MAX_UNDO_DEPTH {
+            stack.placements.remove(0);
+        }
+        stack.placements.push(placement);
+        Ok(())
+    }
+
+    /// Puts the active window back where it was before the last placement, and
+    /// does nothing when there is no placement left to take back.
+    fn undo(&mut self, hwnd: HWND, process_id: u32) -> Result<Option<Rect>, ApplyError> {
+        let key = hwnd.0 as usize;
+        let Some(stack) = self.undo.get_mut(&key) else {
+            return Ok(None);
+        };
+        if stack.process_id != process_id {
+            self.undo.remove(&key);
+            return Ok(None);
+        }
+        let Some(placement) = stack.placements.pop() else {
+            self.undo.remove(&key);
+            return Ok(None);
+        };
+        if stack.placements.is_empty() {
+            self.undo.remove(&key);
+        }
+
+        unsafe {
+            SetWindowPlacement(hwnd, &placement)?;
+        }
+        // The window is back where something other than Quboid had put it, so it
+        // is no longer ours to put back after a display change.
+        self.forget_arrangement(hwnd);
+        debug!("undid the last window placement");
+        Ok(None)
+    }
+}
+
+fn window_placement(hwnd: HWND) -> Result<WINDOWPLACEMENT, ApplyError> {
+    let mut placement = WINDOWPLACEMENT {
+        length: size_of::<WINDOWPLACEMENT>() as u32,
+        ..Default::default()
+    };
+    unsafe {
+        GetWindowPlacement(hwnd, &mut placement)?;
+    }
+    Ok(placement)
 }
 
 struct SavedPlacement {
     process_id: u32,
     placement: WINDOWPLACEMENT,
+}
+
+/// The placements a window had before Quboid moved it, most recent last.
+struct UndoStack {
+    process_id: u32,
+    placements: Vec<WINDOWPLACEMENT>,
 }
 
 /// Where a window was put, in terms that outlive the monitor it was put on.

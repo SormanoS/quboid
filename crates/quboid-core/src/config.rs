@@ -135,6 +135,7 @@ fn rectangle_default_hotkeys() -> Vec<HotkeyBinding> {
         (Action::Shrink, CONTROL_ALT, 0xBD),
         (Action::Center, CONTROL_ALT, 0x43),
         (Action::Restore, CONTROL_ALT, 0x2E),
+        (Action::Undo, CONTROL_ALT, 0x5A),
         (Action::PreviousMonitor, CONTROL_ALT | WIN, 0x25),
         (Action::NextMonitor, CONTROL_ALT | WIN, 0x27),
         (Action::ShowShortcuts, CONTROL_ALT, 0xBF),
