@@ -1148,6 +1148,7 @@ fn action_groups() -> [ActionGroup; 6] {
                 Action::Grow,
                 Action::Shrink,
                 Action::Restore,
+                Action::Undo,
             ],
         ),
         (
@@ -1498,6 +1499,26 @@ fn paint_action_preview(
         return;
     }
 
+    if action == Action::Undo {
+        let previous = normalized_preview_rect(monitor, [0.06, 0.2, 0.44, 0.8]);
+        let current = normalized_preview_rect(monitor, [0.56, 0.2, 0.94, 0.8]);
+        painter.rect_stroke(
+            current,
+            2.0,
+            Stroke::new(1.0, foreground),
+            StrokeKind::Inside,
+        );
+        painter.rect_filled(previous, 2.0, accent.gamma_multiply(0.72));
+        painter.rect_stroke(previous, 2.0, Stroke::new(1.0, accent), StrokeKind::Inside);
+        paint_arrow(
+            painter,
+            current.left_center(),
+            previous.right_center(),
+            accent,
+        );
+        return;
+    }
+
     if action == Action::ShowShortcuts {
         for index in 0..3 {
             let y = monitor.top() + monitor.height() * (index as f32 + 1.0) / 4.0;
@@ -1542,7 +1563,11 @@ fn paint_action_preview(
         Action::MoveLeft | Action::MoveRight | Action::MoveUp | Action::MoveDown => {
             [0.28, 0.24, 0.72, 0.76]
         }
-        Action::NextMonitor | Action::PreviousMonitor | Action::Restore | Action::ShowShortcuts => {
+        Action::NextMonitor
+        | Action::PreviousMonitor
+        | Action::Restore
+        | Action::Undo
+        | Action::ShowShortcuts => {
             unreachable!()
         }
     };
@@ -1662,6 +1687,7 @@ pub fn action_name(language: Language, action: Action) -> &'static str {
         Action::MoveDown => "Sposta in basso",
         Action::Maximize => "Massimizza",
         Action::Restore => "Ripristina",
+        Action::Undo => "Annulla spostamento",
         Action::NextMonitor => "Monitor successivo",
         Action::PreviousMonitor => "Monitor precedente",
         Action::ShowShortcuts => "Mostra scorciatoie",
@@ -1693,6 +1719,7 @@ pub fn action_name(language: Language, action: Action) -> &'static str {
         Action::MoveDown => "Move down",
         Action::Maximize => "Maximize",
         Action::Restore => "Restore",
+        Action::Undo => "Undo placement",
         Action::NextMonitor => "Next monitor",
         Action::PreviousMonitor => "Previous monitor",
         Action::ShowShortcuts => "Show shortcuts",

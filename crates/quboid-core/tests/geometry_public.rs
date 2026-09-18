@@ -49,6 +49,7 @@ fn system_actions_do_not_claim_a_geometric_target() {
     for action in [
         Action::Maximize,
         Action::Restore,
+        Action::Undo,
         Action::NextMonitor,
         Action::PreviousMonitor,
         Action::ShowShortcuts,
