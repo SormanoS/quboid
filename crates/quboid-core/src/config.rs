@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -10,7 +11,7 @@ use thiserror::Error;
 
 use crate::{Action, NORMALIZED_SCALE};
 
-pub const CURRENT_SCHEMA_VERSION: u32 = 5;
+pub const CURRENT_SCHEMA_VERSION: u32 = 6;
 pub const MAX_CONFIG_BYTES: usize = 1024 * 1024;
 pub const CONFIG_FILE_NAME: &str = "config.json";
 pub const INSTALLED_DIRECTORY_NAME: &str = "Quboid";
@@ -562,6 +563,7 @@ fn migrate(mut value: Value, mut version: u32) -> Result<(Value, Vec<String>), C
             2 => migrate_v2_to_v3(value)?,
             3 => migrate_v3_to_v4(value, &mut discarded)?,
             4 => migrate_v4_to_v5(value)?,
+            5 => migrate_v5_to_v6(value)?,
             unsupported => return Err(ConfigError::UnsupportedVersion(unsupported).into()),
         };
         version += 1;
@@ -617,6 +619,39 @@ fn migrate_v4_to_v5(value: Value) -> Result<Value, ConfigStorageError> {
         &defaults.restore_on_display_change,
     )?;
     object.insert("schema_version".to_owned(), Value::from(5_u32));
+    Ok(Value::Object(object))
+}
+
+/// Version 6 gives a default shortcut to the actions a document has never heard
+/// of. Without it an action added after the document was written stays
+/// unreachable forever, because a load never merges the defaults back in.
+///
+/// A key combination already spoken for is left alone: an existing shortcut the
+/// user chose outranks a default.
+fn migrate_v5_to_v6(value: Value) -> Result<Value, ConfigStorageError> {
+    let mut object = expect_object(value)?;
+    let mut bindings: Vec<HotkeyBinding> = match object.get("hotkeys") {
+        Some(hotkeys) => serde_json::from_value(hotkeys.clone())?,
+        None => Vec::new(),
+    };
+
+    let known: HashSet<Action> = bindings.iter().map(|binding| binding.action).collect();
+    let mut taken: HashSet<(u32, u32)> = bindings
+        .iter()
+        .map(|binding| (binding.modifiers, binding.virtual_key))
+        .collect();
+
+    for default in rectangle_default_hotkeys() {
+        if known.contains(&default.action)
+            || !taken.insert((default.modifiers, default.virtual_key))
+        {
+            continue;
+        }
+        bindings.push(default);
+    }
+
+    insert_serialized(&mut object, "hotkeys", &bindings)?;
+    object.insert("schema_version".to_owned(), Value::from(6_u32));
     Ok(Value::Object(object))
 }
 
@@ -864,7 +899,22 @@ mod tests {
             .unwrap()
             .config;
 
-        assert_eq!(migrated.hotkeys, custom);
+        // The chosen binding survives untouched. The actions the document never
+        // mentioned are filled in from the defaults, which is what version 6
+        // added.
+        assert_eq!(migrated.hotkeys.first(), custom.first());
+        assert!(
+            migrated
+                .hotkeys
+                .iter()
+                .any(|binding| binding.action == Action::Undo)
+        );
+        assert!(
+            !migrated
+                .hotkeys
+                .iter()
+                .any(|binding| binding.action == Action::Center && binding.modifiers == 0x0003)
+        );
     }
 
     #[test]

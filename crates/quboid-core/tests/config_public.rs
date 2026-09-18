@@ -48,6 +48,68 @@ fn default_shortcuts_match_rectangle_windows_mapping() {
 }
 
 #[test]
+fn a_document_written_before_an_action_existed_gains_its_default_shortcut() {
+    let storage = PortableConfigAdapter::new("unused");
+    let document = br#"{
+        "schema_version": 5,
+        "language": "italian",
+        "launch_at_login": false,
+        "drag_snap_enabled": true,
+        "restore_on_display_change": true,
+        "hotkeys": [
+            { "action": "left_half", "modifiers": 3, "virtual_key": 37 }
+        ]
+    }"#;
+
+    let config = storage.import(document).unwrap().config;
+
+    let binding = |action: Action| {
+        config
+            .hotkeys
+            .iter()
+            .find(|binding| binding.action == action)
+            .map(|binding| (binding.modifiers, binding.virtual_key))
+    };
+    assert_eq!(binding(Action::Undo), Some((0x0003, 0x5A)));
+    assert_eq!(binding(Action::ShowShortcuts), Some((0x0003, 0x53)));
+    assert_eq!(binding(Action::LeftHalf), Some((0x0003, 0x25)));
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn a_shortcut_the_user_chose_outranks_the_default_that_wants_the_same_keys() {
+    let storage = PortableConfigAdapter::new("unused");
+    let document = br#"{
+        "schema_version": 5,
+        "language": "italian",
+        "launch_at_login": false,
+        "drag_snap_enabled": true,
+        "restore_on_display_change": true,
+        "hotkeys": [
+            { "action": "center", "modifiers": 3, "virtual_key": 90 }
+        ]
+    }"#;
+
+    let config = storage.import(document).unwrap().config;
+
+    assert_eq!(
+        config
+            .hotkeys
+            .iter()
+            .filter(|binding| (binding.modifiers, binding.virtual_key) == (0x0003, 0x5A))
+            .count(),
+        1
+    );
+    assert!(
+        !config
+            .hotkeys
+            .iter()
+            .any(|binding| binding.action == Action::Undo)
+    );
+    assert!(config.validate().is_ok());
+}
+
+#[test]
 fn installed_and_portable_adapters_keep_independent_documents() {
     let directory = tempfile::tempdir().unwrap();
     let portable = PortableConfigAdapter::new(directory.path());
@@ -144,7 +206,14 @@ fn legacy_document_keeps_base_settings_and_reports_unsupported_sections() {
     assert_eq!(imported.config.language, Language::English);
     assert_eq!(imported.config.gap, 12);
     assert_eq!(imported.config.snap_threshold, 640);
-    assert_eq!(imported.config.hotkeys.len(), 1);
+    assert_eq!(
+        imported.config.hotkeys.first().unwrap().action,
+        Action::LeftHalf
+    );
+    assert_eq!(
+        imported.config.hotkeys.len(),
+        AppConfig::default().hotkeys.len()
+    );
     assert_eq!(
         imported.discarded_sections,
         vec![
@@ -274,7 +343,14 @@ fn a_document_from_another_distribution_is_imported_without_its_foreign_sections
 
     assert_eq!(imported.config.language, Language::English);
     assert_eq!(imported.config.gap, 5);
-    assert_eq!(imported.config.hotkeys.len(), 1);
+    assert_eq!(
+        imported.config.hotkeys.first().unwrap().action,
+        Action::LeftHalf
+    );
+    assert_eq!(
+        imported.config.hotkeys.len(),
+        AppConfig::default().hotkeys.len()
+    );
     assert_eq!(
         imported.config.schema_version,
         quboid_core::CURRENT_SCHEMA_VERSION
