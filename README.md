@@ -42,6 +42,7 @@ it from controlling elevated windows.
   an undock
 - Configurable global shortcuts, one action per shortcut
 - Edge and corner drag snapping with a non-interactive overlay
+- A gap that keeps its size on every monitor, whatever each one is scaled to
 - Italian and English interface, picked from the Windows user locale on first run, tray mode and launch at login
 - Versioned JSON configuration with import/export and portable mode
 
@@ -85,6 +86,11 @@ Displays are matched by device name, so a monitor that Windows renumbers is
 treated as a different one and its windows simply stay where they are.
 
 ## Configuration
+
+The `gap` is a size at 100%, so Quboid scales it to the effective DPI of the
+monitor a window lands on: the same setting looks the same on a 4K display at
+200% as on an unscaled one, and a window dragged between the two keeps the gap
+it appears to have.
 
 The document is stored at `%APPDATA%\Quboid\config.json`, or next to the
 executable when a `portable.flag` file is present. Documents written by earlier
