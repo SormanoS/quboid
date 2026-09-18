@@ -34,13 +34,14 @@ fn default_shortcuts_match_rectangle_windows_mapping() {
             .map(|binding| (binding.modifiers, binding.virtual_key))
     };
 
-    assert_eq!(config.hotkeys.len(), 22);
+    assert_eq!(config.hotkeys.len(), 23);
     assert_eq!(binding(Action::LeftHalf), Some((0x0003, 0x25)));
     assert_eq!(binding(Action::TopLeft), Some((0x0003, 0x55)));
     assert_eq!(binding(Action::CenterTwoThirds), Some((0x0003, 0x52)));
     assert_eq!(binding(Action::Maximize), Some((0x0003, 0x0D)));
     assert_eq!(binding(Action::MaximizeHeight), Some((0x0007, 0x26)));
     assert_eq!(binding(Action::NextMonitor), Some((0x000B, 0x27)));
+    assert_eq!(binding(Action::ShowShortcuts), Some((0x0003, 0xBF)));
     assert_eq!(binding(Action::AlmostMaximize), None);
     assert_eq!(binding(Action::CenterHalf), None);
 }

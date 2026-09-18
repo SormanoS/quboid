@@ -137,6 +137,7 @@ fn rectangle_default_hotkeys() -> Vec<HotkeyBinding> {
         (Action::Restore, CONTROL_ALT, 0x2E),
         (Action::PreviousMonitor, CONTROL_ALT | WIN, 0x25),
         (Action::NextMonitor, CONTROL_ALT | WIN, 0x27),
+        (Action::ShowShortcuts, CONTROL_ALT, 0xBF),
     ]
     .into_iter()
     .map(|(action, modifiers, virtual_key)| HotkeyBinding {

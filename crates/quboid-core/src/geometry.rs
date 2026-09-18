@@ -180,7 +180,11 @@ impl LayoutEngine {
             Action::MoveRight => Self::translate(current, work, work.width() / 20, 0),
             Action::MoveUp => Self::translate(current, work, 0, -work.height() / 20),
             Action::MoveDown => Self::translate(current, work, 0, work.height() / 20),
-            Action::Maximize | Action::Restore | Action::NextMonitor | Action::PreviousMonitor => {
+            Action::Maximize
+            | Action::Restore
+            | Action::NextMonitor
+            | Action::PreviousMonitor
+            | Action::ShowShortcuts => {
                 return None;
             }
         };
