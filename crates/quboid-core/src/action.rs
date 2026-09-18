@@ -35,10 +35,13 @@ pub enum Action {
     Undo,
     NextMonitor,
     PreviousMonitor,
+    /// Shows every shortcut at once. The odd one out: it teaches instead of
+    /// moving a window, so no window has to be active for it to mean anything.
+    ShowShortcuts,
 }
 
 impl Action {
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 30] = [
         Self::LeftHalf,
         Self::RightHalf,
         Self::TopHalf,
@@ -68,6 +71,7 @@ impl Action {
         Self::Undo,
         Self::NextMonitor,
         Self::PreviousMonitor,
+        Self::ShowShortcuts,
     ];
 
     pub const fn label_key(self) -> &'static str {
@@ -101,6 +105,7 @@ impl Action {
             Self::Undo => "undo",
             Self::NextMonitor => "next_monitor",
             Self::PreviousMonitor => "previous_monitor",
+            Self::ShowShortcuts => "show_shortcuts",
         }
     }
 }
@@ -129,6 +134,10 @@ pub enum RuntimeEvent {
     ArrangementRestored {
         windows: usize,
     },
+    /// The user asked to see every shortcut at once.
+    ShortcutsRequested,
+    /// Undo was asked for a window that has nothing left to take back.
+    NothingToUndo,
     HotkeyConflict {
         action: Action,
     },

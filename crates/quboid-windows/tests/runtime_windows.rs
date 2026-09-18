@@ -119,6 +119,22 @@ fn restore_returns_the_window_to_its_original_placement() {
 
 #[test]
 #[serial]
+fn showing_the_shortcuts_asks_the_host_instead_of_placing_a_window() {
+    let runtime = start_runtime(base_config());
+
+    runtime
+        .commands()
+        .send(RuntimeCommand::Apply(Action::ShowShortcuts))
+        .unwrap();
+
+    let event = receive_matching(&runtime, |event| {
+        matches!(event, RuntimeEvent::ShortcutsRequested)
+    });
+    assert!(matches!(event, RuntimeEvent::ShortcutsRequested));
+}
+
+#[test]
+#[serial]
 fn undo_steps_back_through_the_placements_one_at_a_time() {
     let runtime = start_runtime(base_config());
     let window = TestWindow::new();
@@ -138,14 +154,21 @@ fn undo_steps_back_through_the_placements_one_at_a_time() {
 
 #[test]
 #[serial]
-fn undo_leaves_a_window_alone_when_there_is_nothing_to_take_back() {
+fn undo_says_so_when_there_is_nothing_to_take_back() {
     let runtime = start_runtime(base_config());
     let window = TestWindow::new();
     window.make_foreground();
     let original = window.visible_rect();
 
-    apply_action(&runtime, Action::Undo);
+    runtime
+        .commands()
+        .send(RuntimeCommand::Apply(Action::Undo))
+        .unwrap();
 
+    let event = receive_matching(&runtime, |event| {
+        matches!(event, RuntimeEvent::NothingToUndo)
+    });
+    assert!(matches!(event, RuntimeEvent::NothingToUndo));
     assert_rect_close(window.visible_rect(), original, 8);
 }
 

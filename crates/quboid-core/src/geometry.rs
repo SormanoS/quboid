@@ -184,7 +184,8 @@ impl LayoutEngine {
             | Action::Restore
             | Action::Undo
             | Action::NextMonitor
-            | Action::PreviousMonitor => {
+            | Action::PreviousMonitor
+            | Action::ShowShortcuts => {
                 return None;
             }
         };

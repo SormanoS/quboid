@@ -58,6 +58,8 @@ pub struct UiState {
     status: String,
     shortcut_capture: Option<ShortcutCapture>,
     win_keys_down: [bool; 2],
+    /// Whether the read-only list of every shortcut is open over the page.
+    cheat_sheet: bool,
     extension: Option<Box<dyn UiExtension>>,
 }
 
@@ -70,6 +72,7 @@ impl UiState {
             status,
             shortcut_capture: None,
             win_keys_down: [false; 2],
+            cheat_sheet: false,
             extension: None,
         }
     }
@@ -188,6 +191,10 @@ impl UiState {
                 });
             });
 
+        if self.cheat_sheet {
+            self.show_cheat_sheet(root);
+        }
+
         if changed {
             match self.config.validate() {
                 Ok(()) => intents.push(UiIntent::Save(self.config.clone())),
@@ -236,6 +243,21 @@ impl UiState {
                     "Windows restored after the display change"
                 )
             ),
+            RuntimeEvent::ShortcutsRequested => {
+                self.cheat_sheet = true;
+                text(
+                    self.config.language,
+                    "Tutte le scorciatoie",
+                    "Every shortcut",
+                )
+                .to_owned()
+            }
+            RuntimeEvent::NothingToUndo => text(
+                self.config.language,
+                "Niente da annullare",
+                "Nothing to undo",
+            )
+            .to_owned(),
             RuntimeEvent::HotkeyConflict { action } => format!(
                 "{}: {}",
                 text(
@@ -433,14 +455,109 @@ impl UiState {
         scrollable(ui, page, |ui| extension.show(page, ui, language, intents))
     }
 
+    /// Every action and the shortcut that runs it, read only, over whatever page
+    /// is open. Quboid has more actions than anyone memorizes, so the shortcuts
+    /// have to be readable without going hunting through their editor.
+    fn show_cheat_sheet(&mut self, ui: &mut Ui) {
+        let language = self.config.language;
+        let hotkeys = self.config.hotkeys.clone();
+        let mut close = false;
+        let modal = egui::Modal::new(egui::Id::new("cheat-sheet")).show(ui.ctx(), |ui| {
+            let palette = Palette::of(ui);
+            ui.set_width(620.0);
+            ui.label(
+                RichText::new(text(language, "Tutte le scorciatoie", "Every shortcut"))
+                    .strong()
+                    .size(18.0)
+                    .color(palette.text_primary),
+            );
+            ui.add_space(2.0);
+            ui.label(
+                RichText::new(text(
+                    language,
+                    "Premi Esc per chiudere.",
+                    "Press Esc to close.",
+                ))
+                .size(12.0)
+                .color(palette.text_secondary),
+            );
+            ui.add_space(10.0);
+            ui.separator();
+            ui.add_space(4.0);
+            egui::ScrollArea::vertical()
+                .max_height(420.0)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    for (index, (id, italian, english, actions)) in
+                        action_groups().into_iter().enumerate()
+                    {
+                        ui.push_id(id, |ui| {
+                            if index > 0 {
+                                ui.add_space(14.0);
+                            }
+                            ui.label(
+                                RichText::new(text(language, italian, english))
+                                    .strong()
+                                    .size(13.0)
+                                    .color(palette.brand_text),
+                            );
+                            ui.add_space(4.0);
+                            egui::Grid::new("rows")
+                                .num_columns(2)
+                                .striped(true)
+                                .spacing([24.0, 8.0])
+                                .min_col_width(220.0)
+                                .show(ui, |ui| {
+                                    for action in actions.iter().copied() {
+                                        ui.label(
+                                            RichText::new(action_name(language, action))
+                                                .color(palette.text_primary),
+                                        );
+                                        match shortcut_for(&hotkeys, action, language) {
+                                            Some(shortcut) => paint_key_cap(ui, &shortcut, palette),
+                                            None => {
+                                                ui.label(
+                                                    RichText::new(text(
+                                                        language,
+                                                        "Non assegnata",
+                                                        "Unassigned",
+                                                    ))
+                                                    .italics()
+                                                    .color(palette.text_secondary),
+                                                );
+                                            }
+                                        }
+                                        ui.end_row();
+                                    }
+                                });
+                        });
+                    }
+                });
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(4.0);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button(text(language, "Chiudi", "Close")).clicked() {
+                    close = true;
+                }
+            });
+        });
+
+        if close || modal.should_close() {
+            self.cheat_sheet = false;
+        }
+    }
+
     fn actions_page(&mut self, ui: &mut Ui, intents: &mut Vec<UiIntent>) {
+        let palette = Palette::of(ui);
         egui::ScrollArea::vertical().show(ui, |ui| {
             for (id, italian, english, actions) in action_groups() {
                 ui.push_id(id, |ui| {
                     ui.label(
                         RichText::new(text(self.config.language, italian, english))
                             .strong()
-                            .size(15.0),
+                            .size(15.0)
+                            .color(palette.text_primary),
                     );
                     ui.add_space(5.0);
                     let columns = action_column_count(ui.available_width());
@@ -465,7 +582,11 @@ impl UiState {
                                 )
                                 .clicked()
                                 {
-                                    intents.push(UiIntent::Apply(action));
+                                    if action == Action::ShowShortcuts {
+                                        self.cheat_sheet = true;
+                                    } else {
+                                        intents.push(UiIntent::Apply(action));
+                                    }
                                 }
                                 if (index + 1) % columns == 0 {
                                     ui.end_row();
@@ -508,6 +629,12 @@ impl UiState {
                         })
                         .unwrap_or(Action::LeftHalf);
                     self.shortcut_capture = Some(ShortcutCapture::New(action));
+                }
+                if ui
+                    .button(text(language, "Tutte le scorciatoie", "Every shortcut"))
+                    .clicked()
+                {
+                    self.cheat_sheet = true;
                 }
             },
         );
@@ -985,13 +1112,30 @@ pub fn surface_frame(ui: &Ui) -> egui::Frame {
 
 type ActionGroup = (&'static str, &'static str, &'static str, &'static [Action]);
 
+/// Draws a shortcut the way a key looks: a tinted cap with a hairline around it.
+///
+/// The keys are what someone scans the list for, so they need to be findable
+/// without reading the names next to them. Plain bold text will not do it: egui
+/// takes the colour of bold text from the pressed-widget style, which is white
+/// on both themes, and white is invisible on a light surface.
+fn paint_key_cap(ui: &mut Ui, shortcut: &str, palette: Palette) {
+    egui::Frame::new()
+        .fill(palette.brand_soft)
+        .stroke(Stroke::new(1.0, palette.border))
+        .corner_radius(6)
+        .inner_margin(egui::Margin::symmetric(8, 3))
+        .show(ui, |ui| {
+            ui.label(RichText::new(shortcut).size(12.5).color(palette.brand_text));
+        });
+}
+
 fn action_column_count(available_width: f32) -> usize {
     (((available_width + ACTION_CARD_SPACING) / (ACTION_CARD_MIN_WIDTH + ACTION_CARD_SPACING))
         .floor() as usize)
         .clamp(1, ACTION_MAX_COLUMNS)
 }
 
-fn action_groups() -> [ActionGroup; 5] {
+fn action_groups() -> [ActionGroup; 6] {
     [
         (
             "halves",
@@ -1057,6 +1201,7 @@ fn action_groups() -> [ActionGroup; 5] {
                 Action::MoveDown,
             ],
         ),
+        ("discover", "Scopri", "Discover", &[Action::ShowShortcuts]),
     ]
 }
 
@@ -1411,6 +1556,25 @@ fn paint_action_preview(
         return;
     }
 
+    if action == Action::ShowShortcuts {
+        for index in 0..3 {
+            let y = monitor.top() + monitor.height() * (index as f32 + 1.0) / 4.0;
+            let key = egui::Rect::from_min_max(
+                egui::pos2(monitor.left() + 5.0, y - 2.5),
+                egui::pos2(monitor.left() + 17.0, y + 2.5),
+            );
+            painter.rect_filled(key, 1.5, accent.gamma_multiply(0.72));
+            painter.line_segment(
+                [
+                    egui::pos2(key.right() + 4.0, y),
+                    egui::pos2(monitor.right() - 5.0, y),
+                ],
+                Stroke::new(1.0, foreground),
+            );
+        }
+        return;
+    }
+
     let area = match action {
         Action::LeftHalf => [0.0, 0.0, 0.5, 1.0],
         Action::RightHalf => [0.5, 0.0, 1.0, 1.0],
@@ -1436,7 +1600,11 @@ fn paint_action_preview(
         Action::MoveLeft | Action::MoveRight | Action::MoveUp | Action::MoveDown => {
             [0.28, 0.24, 0.72, 0.76]
         }
-        Action::NextMonitor | Action::PreviousMonitor | Action::Restore | Action::Undo => {
+        Action::NextMonitor
+        | Action::PreviousMonitor
+        | Action::Restore
+        | Action::Undo
+        | Action::ShowShortcuts => {
             unreachable!()
         }
     };
@@ -1559,6 +1727,7 @@ pub fn action_name(language: Language, action: Action) -> &'static str {
         Action::Undo => "Annulla spostamento",
         Action::NextMonitor => "Monitor successivo",
         Action::PreviousMonitor => "Monitor precedente",
+        Action::ShowShortcuts => "Mostra scorciatoie",
     };
     let english = match action {
         Action::LeftHalf => "Left half",
@@ -1590,6 +1759,7 @@ pub fn action_name(language: Language, action: Action) -> &'static str {
         Action::Undo => "Undo placement",
         Action::NextMonitor => "Next monitor",
         Action::PreviousMonitor => "Previous monitor",
+        Action::ShowShortcuts => "Show shortcuts",
     };
     text(language, italian, english)
 }
