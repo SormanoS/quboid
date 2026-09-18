@@ -136,6 +136,8 @@ pub enum RuntimeEvent {
     },
     /// The user asked to see every shortcut at once.
     ShortcutsRequested,
+    /// A second Quboid was started and handed its launch over to this one.
+    ActivationRequested,
     /// Undo was asked for a window that has nothing left to take back.
     NothingToUndo,
     HotkeyConflict {

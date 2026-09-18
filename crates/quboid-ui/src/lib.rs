@@ -252,6 +252,12 @@ impl UiState {
                 )
                 .to_owned()
             }
+            RuntimeEvent::ActivationRequested => text(
+                self.config.language,
+                "Quboid era già in esecuzione",
+                "Quboid was already running",
+            )
+            .to_owned(),
             RuntimeEvent::NothingToUndo => text(
                 self.config.language,
                 "Niente da annullare",
