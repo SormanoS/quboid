@@ -119,6 +119,38 @@ fn restore_returns_the_window_to_its_original_placement() {
 
 #[test]
 #[serial]
+fn undo_steps_back_through_the_placements_one_at_a_time() {
+    let runtime = start_runtime(base_config());
+    let window = TestWindow::new();
+    window.make_foreground();
+    let original = window.visible_rect();
+
+    apply_action(&runtime, Action::LeftHalf);
+    let left_half = window.visible_rect();
+    apply_action(&runtime, Action::BottomRight);
+
+    apply_action(&runtime, Action::Undo);
+    assert_rect_close(window.visible_rect(), left_half, 8);
+
+    apply_action(&runtime, Action::Undo);
+    assert_rect_close(window.visible_rect(), original, 8);
+}
+
+#[test]
+#[serial]
+fn undo_leaves_a_window_alone_when_there_is_nothing_to_take_back() {
+    let runtime = start_runtime(base_config());
+    let window = TestWindow::new();
+    window.make_foreground();
+    let original = window.visible_rect();
+
+    apply_action(&runtime, Action::Undo);
+
+    assert_rect_close(window.visible_rect(), original, 8);
+}
+
+#[test]
+#[serial]
 fn configured_area_is_applied_with_the_configured_gap() {
     let mut config = base_config();
     config.gap = 12;
@@ -465,6 +497,18 @@ fn start_runtime_with(config: AppConfig, adapters: RuntimeAdapters) -> Runtime {
         RuntimeEvent::Ready
     ));
     runtime
+}
+
+/// Sends an action and waits for the runtime to report that it ran.
+fn apply_action(runtime: &Runtime, action: Action) {
+    runtime
+        .commands()
+        .send(RuntimeCommand::Apply(action))
+        .unwrap();
+    receive_matching(
+        runtime,
+        |event| matches!(event, RuntimeEvent::Applied { action: applied, .. } if *applied == action),
+    );
 }
 
 fn receive_matching(runtime: &Runtime, predicate: impl Fn(&RuntimeEvent) -> bool) -> RuntimeEvent {

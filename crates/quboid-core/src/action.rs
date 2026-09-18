@@ -31,12 +31,14 @@ pub enum Action {
     MoveDown,
     Maximize,
     Restore,
+    /// Puts the active window back where it was before the last placement.
+    Undo,
     NextMonitor,
     PreviousMonitor,
 }
 
 impl Action {
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 29] = [
         Self::LeftHalf,
         Self::RightHalf,
         Self::TopHalf,
@@ -63,6 +65,7 @@ impl Action {
         Self::MoveDown,
         Self::Maximize,
         Self::Restore,
+        Self::Undo,
         Self::NextMonitor,
         Self::PreviousMonitor,
     ];
@@ -95,6 +98,7 @@ impl Action {
             Self::MoveDown => "move_down",
             Self::Maximize => "maximize",
             Self::Restore => "restore",
+            Self::Undo => "undo",
             Self::NextMonitor => "next_monitor",
             Self::PreviousMonitor => "previous_monitor",
         }

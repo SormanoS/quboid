@@ -1041,6 +1041,7 @@ fn action_groups() -> [ActionGroup; 5] {
                 Action::Grow,
                 Action::Shrink,
                 Action::Restore,
+                Action::Undo,
             ],
         ),
         (
@@ -1390,6 +1391,26 @@ fn paint_action_preview(
         return;
     }
 
+    if action == Action::Undo {
+        let previous = normalized_preview_rect(monitor, [0.06, 0.2, 0.44, 0.8]);
+        let current = normalized_preview_rect(monitor, [0.56, 0.2, 0.94, 0.8]);
+        painter.rect_stroke(
+            current,
+            2.0,
+            Stroke::new(1.0, foreground),
+            StrokeKind::Inside,
+        );
+        painter.rect_filled(previous, 2.0, accent.gamma_multiply(0.72));
+        painter.rect_stroke(previous, 2.0, Stroke::new(1.0, accent), StrokeKind::Inside);
+        paint_arrow(
+            painter,
+            current.left_center(),
+            previous.right_center(),
+            accent,
+        );
+        return;
+    }
+
     let area = match action {
         Action::LeftHalf => [0.0, 0.0, 0.5, 1.0],
         Action::RightHalf => [0.5, 0.0, 1.0, 1.0],
@@ -1415,7 +1436,9 @@ fn paint_action_preview(
         Action::MoveLeft | Action::MoveRight | Action::MoveUp | Action::MoveDown => {
             [0.28, 0.24, 0.72, 0.76]
         }
-        Action::NextMonitor | Action::PreviousMonitor | Action::Restore => unreachable!(),
+        Action::NextMonitor | Action::PreviousMonitor | Action::Restore | Action::Undo => {
+            unreachable!()
+        }
     };
     let highlighted = normalized_preview_rect(monitor, area);
     painter.rect_filled(highlighted, 2.0, accent.gamma_multiply(0.72));
@@ -1533,6 +1556,7 @@ pub fn action_name(language: Language, action: Action) -> &'static str {
         Action::MoveDown => "Sposta in basso",
         Action::Maximize => "Massimizza",
         Action::Restore => "Ripristina",
+        Action::Undo => "Annulla spostamento",
         Action::NextMonitor => "Monitor successivo",
         Action::PreviousMonitor => "Monitor precedente",
     };
@@ -1563,6 +1587,7 @@ pub fn action_name(language: Language, action: Action) -> &'static str {
         Action::MoveDown => "Move down",
         Action::Maximize => "Maximize",
         Action::Restore => "Restore",
+        Action::Undo => "Undo placement",
         Action::NextMonitor => "Next monitor",
         Action::PreviousMonitor => "Previous monitor",
     };
