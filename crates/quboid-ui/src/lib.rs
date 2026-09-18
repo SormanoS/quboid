@@ -1,5 +1,7 @@
 use egui::{Color32, Event, Key, Modifiers, RichText, Sense, Stroke, StrokeKind, Ui};
-use quboid_core::{Action, AppConfig, HotkeyBinding, Language, NormalizedRect, RuntimeEvent};
+use quboid_core::{
+    Action, AppConfig, HotkeyBinding, Language, MAX_GAP, NormalizedRect, RuntimeEvent,
+};
 
 pub mod extension;
 pub mod theme;
@@ -775,7 +777,7 @@ impl UiState {
                     ui.end_row();
 
                     ui.label(text(language, "Gap", "Gap"));
-                    changed |= setting_slider(ui, &mut self.config.gap, 0..=64, " px");
+                    changed |= setting_slider(ui, &mut self.config.gap, 0..=MAX_GAP, " px");
                     ui.end_row();
 
                     ui.label(text(language, "Soglia snap", "Snap threshold"));
