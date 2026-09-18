@@ -157,6 +157,10 @@ fn run_message_loop(
 
     let mut hotkeys = register_hotkeys(&config, &events);
     let mut hotkeys_suspended = false;
+    // A second Quboid posts to this window instead of starting up beside this
+    // one and taking half the shortcuts with it.
+    let signal_window = crate::instance::SignalWindow::new();
+    let show_message = crate::instance::show_message();
     let _ = events.send(RuntimeEvent::Ready);
     let mut windows = WindowManager::new(window_filter);
     windows.update_config(&config);
@@ -190,6 +194,8 @@ fn run_message_loop(
                             apply_and_report(action, &mut windows, &events);
                         }
                     }
+                } else if signal_window.is_some() && message.message == show_message {
+                    let _ = events.send(RuntimeEvent::ActivationRequested);
                 } else {
                     let _ = TranslateMessage(&message);
                     DispatchMessageW(&message);
