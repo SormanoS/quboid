@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{Action, NORMALIZED_SCALE};
 
-pub const CURRENT_SCHEMA_VERSION: u32 = 4;
+pub const CURRENT_SCHEMA_VERSION: u32 = 5;
 pub const MAX_CONFIG_BYTES: usize = 1024 * 1024;
 pub const CONFIG_FILE_NAME: &str = "config.json";
 pub const INSTALLED_DIRECTORY_NAME: &str = "Quboid";
@@ -78,10 +78,18 @@ pub struct AppConfig {
     pub gap: u16,
     #[serde(default = "default_snap_threshold")]
     pub snap_threshold: u16,
+    /// Whether windows Quboid placed are put back where they were once the
+    /// monitors change, which is what a dock or an undock does to them.
+    #[serde(default = "default_restore_on_display_change")]
+    pub restore_on_display_change: bool,
 }
 
 const fn default_snap_threshold() -> u16 {
     DEFAULT_SNAP_THRESHOLD
+}
+
+const fn default_restore_on_display_change() -> bool {
+    true
 }
 
 impl Default for AppConfig {
@@ -94,6 +102,7 @@ impl Default for AppConfig {
             hotkeys: rectangle_default_hotkeys(),
             gap: 0,
             snap_threshold: DEFAULT_SNAP_THRESHOLD,
+            restore_on_display_change: true,
         }
     }
 }
@@ -550,6 +559,7 @@ fn migrate(mut value: Value, mut version: u32) -> Result<(Value, Vec<String>), C
             1 => migrate_v1_to_v2(value)?,
             2 => migrate_v2_to_v3(value)?,
             3 => migrate_v3_to_v4(value, &mut discarded)?,
+            4 => migrate_v4_to_v5(value)?,
             unsupported => return Err(ConfigError::UnsupportedVersion(unsupported).into()),
         };
         version += 1;
@@ -591,6 +601,20 @@ fn migrate_v3_to_v4(
         }
     }
     object.insert("schema_version".to_owned(), Value::from(4_u32));
+    Ok(Value::Object(object))
+}
+
+/// Version 5 records whether a display change puts windows back where they
+/// were. An older document never said, so it gets the default.
+fn migrate_v4_to_v5(value: Value) -> Result<Value, ConfigStorageError> {
+    let mut object = expect_object(value)?;
+    let defaults = AppConfig::default();
+    insert_serialized(
+        &mut object,
+        "restore_on_display_change",
+        &defaults.restore_on_display_change,
+    )?;
+    object.insert("schema_version".to_owned(), Value::from(5_u32));
     Ok(Value::Object(object))
 }
 

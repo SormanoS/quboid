@@ -114,9 +114,20 @@ pub enum RuntimeCommand {
 #[derive(Clone, Debug)]
 pub enum RuntimeEvent {
     Ready,
-    Applied { action: Action, rect: Option<Rect> },
-    AreaApplied { rect: Rect },
-    HotkeyConflict { action: Action },
+    Applied {
+        action: Action,
+        rect: Option<Rect>,
+    },
+    AreaApplied {
+        rect: Rect,
+    },
+    /// The monitors changed and this many windows were put back where they were.
+    ArrangementRestored {
+        windows: usize,
+    },
+    HotkeyConflict {
+        action: Action,
+    },
     NoActiveWindow,
     AccessDenied,
     Failed(String),
