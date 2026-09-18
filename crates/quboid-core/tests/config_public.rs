@@ -42,7 +42,7 @@ fn default_shortcuts_match_rectangle_windows_mapping() {
     assert_eq!(binding(Action::MaximizeHeight), Some((0x0007, 0x26)));
     assert_eq!(binding(Action::NextMonitor), Some((0x000B, 0x27)));
     assert_eq!(binding(Action::Undo), Some((0x0003, 0x5A)));
-    assert_eq!(binding(Action::ShowShortcuts), Some((0x0003, 0xBF)));
+    assert_eq!(binding(Action::ShowShortcuts), Some((0x0003, 0x53)));
     assert_eq!(binding(Action::AlmostMaximize), None);
     assert_eq!(binding(Action::CenterHalf), None);
 }

@@ -48,7 +48,7 @@ fn asking_for_the_shortcuts_lists_the_actions_and_the_keys_that_run_them() {
 
     let _hint = harness.get_by_label("Premi Esc per chiudere.");
     let _bound = harness.get_by_label("Ctrl + Alt + Freccia sinistra");
-    let _discovery = harness.get_by_label("Ctrl + Alt + /");
+    let _discovery = harness.get_by_label("Ctrl + Alt + S");
 }
 
 #[test]
