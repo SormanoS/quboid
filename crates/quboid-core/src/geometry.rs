@@ -4,6 +4,14 @@ use crate::Action;
 
 pub const NORMALIZED_SCALE: u16 = 10_000;
 
+/// The DPI Windows reports for a display at 100%, and the scale the configured
+/// gap is expressed in: the same setting has to look the same size on every
+/// monitor, whatever it is scaled to.
+pub const USER_DEFAULT_SCREEN_DPI: u32 = 96;
+
+/// The largest gap the runtime honours, at 100%.
+pub const MAX_GAP: u16 = 64;
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Point {
     pub x: i32,
@@ -103,6 +111,18 @@ impl Rect {
 pub struct LayoutEngine;
 
 impl LayoutEngine {
+    /// The configured gap in the physical pixels of a display of the given DPI.
+    ///
+    /// The setting is a size at 100%, so a monitor at 150% has to be given half
+    /// again as many pixels for the gap to look the same there.
+    pub fn gap_pixels(gap: u16, dpi: u32) -> i32 {
+        let dpi = if dpi == 0 {
+            USER_DEFAULT_SCREEN_DPI
+        } else {
+            dpi
+        };
+        (i64::from(gap.min(MAX_GAP)) * i64::from(dpi) / i64::from(USER_DEFAULT_SCREEN_DPI)) as i32
+    }
     pub fn target(action: Action, current: Rect, work: Rect) -> Option<Rect> {
         if !current.is_valid() || !work.is_valid() {
             return None;
