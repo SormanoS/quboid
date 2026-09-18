@@ -7,7 +7,9 @@ pub struct SnapRequest<'a> {
     pub cursor: Point,
     /// Work area of the monitor under the cursor.
     pub work_area: Rect,
-    /// Gap to leave around the snapped window, in pixels.
+    /// Gap to leave around the snapped window, in the physical pixels of the
+    /// monitor under the cursor: the configured size is already resolved for
+    /// that monitor's scale.
     pub gap: i32,
     /// Edge sensitivity, in `NORMALIZED_SCALE` units.
     pub snap_threshold: u16,
