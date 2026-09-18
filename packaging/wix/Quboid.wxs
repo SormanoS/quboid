@@ -1,4 +1,5 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="Quboid"
     Manufacturer="Quboid contributors"
@@ -7,6 +8,17 @@
     Scope="perUser">
     <MajorUpgrade DowngradeErrorMessage="A newer version of Quboid is already installed." />
     <MediaTemplate EmbedCab="yes" />
+
+    <!-- An upgrade replaces the executable without stopping what is running,
+         and Quboid lives in the tray where nobody thinks to close it. The old
+         process keeps every global shortcut it registered, so the new one
+         would start powerless. Stop it before the files are swapped. -->
+    <util:CloseApplication
+      Id="CloseRunningQuboid"
+      Target="quboid-app.exe"
+      CloseMessage="no"
+      TerminateProcess="0"
+      RebootPrompt="no" />
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="INSTALLFOLDER" Name="Quboid" />
