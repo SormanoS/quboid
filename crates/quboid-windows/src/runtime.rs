@@ -416,6 +416,12 @@ fn unregister_hotkeys(hotkeys: &[RegisteredHotkey]) {
 }
 
 fn apply_and_report(action: Action, windows: &mut WindowManager, events: &Sender<RuntimeEvent>) {
+    if action == Action::ShowShortcuts {
+        // Nothing to place: this one asks the host to teach, and it has to work
+        // even when no window is eligible.
+        let _ = events.send(RuntimeEvent::ShortcutsRequested);
+        return;
+    }
     match windows.apply(action) {
         Ok(rect) => {
             let _ = events.send(RuntimeEvent::Applied { action, rect });

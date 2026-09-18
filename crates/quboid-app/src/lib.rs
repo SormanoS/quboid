@@ -245,6 +245,12 @@ impl eframe::App for DesktopApp {
         }
 
         while let Ok(event) = self.events.try_recv() {
+            if matches!(event, RuntimeEvent::ShortcutsRequested) {
+                // The shortcut has to work while the window is in the tray:
+                // that is the moment someone needs to be told what is bound.
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            }
             self.ui.handle_event(event);
         }
 

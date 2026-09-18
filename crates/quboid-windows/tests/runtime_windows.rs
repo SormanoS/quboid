@@ -119,6 +119,22 @@ fn restore_returns_the_window_to_its_original_placement() {
 
 #[test]
 #[serial]
+fn showing_the_shortcuts_asks_the_host_instead_of_placing_a_window() {
+    let runtime = start_runtime(base_config());
+
+    runtime
+        .commands()
+        .send(RuntimeCommand::Apply(Action::ShowShortcuts))
+        .unwrap();
+
+    let event = receive_matching(&runtime, |event| {
+        matches!(event, RuntimeEvent::ShortcutsRequested)
+    });
+    assert!(matches!(event, RuntimeEvent::ShortcutsRequested));
+}
+
+#[test]
+#[serial]
 fn configured_area_is_applied_with_the_configured_gap() {
     let mut config = base_config();
     config.gap = 12;

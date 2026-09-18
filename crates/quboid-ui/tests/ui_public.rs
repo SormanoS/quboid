@@ -27,6 +27,57 @@ fn action_button_emits_apply_intent() {
 }
 
 #[test]
+fn asking_for_the_shortcuts_lists_the_actions_and_the_keys_that_run_them() {
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let mut harness = ui_harness(&state, &intents);
+
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::ShortcutsRequested);
+    harness.run();
+
+    let _hint = harness.get_by_label("Premi Esc per chiudere.");
+    let _bound = harness.get_by_label("Ctrl + Alt + Freccia sinistra");
+    let _discovery = harness.get_by_label("Ctrl + Alt + /");
+}
+
+#[test]
+fn the_shortcut_list_closes_with_the_key_it_names() {
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let mut harness = ui_harness(&state, &intents);
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::ShortcutsRequested);
+    harness.run();
+
+    harness.key_press(Key::Escape);
+    harness.run();
+    harness.run();
+
+    assert!(harness.query_by_label("Premi Esc per chiudere.").is_none());
+}
+
+#[test]
+fn the_shortcut_list_closes_from_its_own_button() {
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let mut harness = ui_harness(&state, &intents);
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::ShortcutsRequested);
+    harness.run();
+
+    let close = harness.get_by_label("Chiudi").rect().center();
+    click_at(&mut harness, close);
+    harness.run();
+    harness.run();
+
+    assert!(harness.query_by_label("Premi Esc per chiudere.").is_none());
+}
+
+#[test]
 fn rectangle_action_cards_expose_new_standard_layouts() {
     let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
@@ -131,7 +182,7 @@ fn shortcut_editor_adds_a_valid_binding() {
     assert!(intents.borrow().iter().any(|intent| {
         matches!(
             intent,
-            UiIntent::Save(config) if config.hotkeys.len() == 23 && config.validate().is_ok()
+            UiIntent::Save(config) if config.hotkeys.len() == 24 && config.validate().is_ok()
         )
     }));
 }
@@ -605,6 +656,28 @@ fn ui_harness_with_size(
         ui.set_style(quboid_ui::theme::style(false));
         intents.borrow_mut().extend(state.borrow_mut().show(ui));
     })
+}
+
+/// Clicks where a widget is, rather than through the accessibility tree: an
+/// accessibility click does not reach a widget inside a modal layer.
+fn click_at(harness: &mut Harness<'static>, pos: egui::Pos2) {
+    let modifiers = egui::Modifiers::default();
+    harness
+        .input_mut()
+        .events
+        .push(egui::Event::PointerMoved(pos));
+    harness.input_mut().events.push(egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers,
+    });
+    harness.input_mut().events.push(egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers,
+    });
 }
 
 fn assert_readable(label: &str, text: Color32, background: Color32) {
