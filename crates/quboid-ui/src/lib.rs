@@ -464,11 +464,12 @@ impl UiState {
         let mut close = false;
         let modal = egui::Modal::new(egui::Id::new("cheat-sheet")).show(ui.ctx(), |ui| {
             let palette = Palette::of(ui);
-            ui.set_width(600.0);
+            ui.set_width(620.0);
             ui.label(
                 RichText::new(text(language, "Tutte le scorciatoie", "Every shortcut"))
                     .strong()
-                    .size(18.0),
+                    .size(18.0)
+                    .color(palette.text_primary),
             );
             ui.add_space(2.0);
             ui.label(
@@ -480,31 +481,40 @@ impl UiState {
                 .size(12.0)
                 .color(palette.text_secondary),
             );
-            ui.add_space(12.0);
+            ui.add_space(10.0);
+            ui.separator();
+            ui.add_space(4.0);
             egui::ScrollArea::vertical()
                 .max_height(420.0)
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    for (id, italian, english, actions) in action_groups() {
+                    for (index, (id, italian, english, actions)) in
+                        action_groups().into_iter().enumerate()
+                    {
                         ui.push_id(id, |ui| {
+                            if index > 0 {
+                                ui.add_space(14.0);
+                            }
                             ui.label(
                                 RichText::new(text(language, italian, english))
                                     .strong()
-                                    .size(14.0),
+                                    .size(13.0)
+                                    .color(palette.brand_text),
                             );
                             ui.add_space(4.0);
                             egui::Grid::new("rows")
                                 .num_columns(2)
                                 .striped(true)
-                                .spacing([18.0, 6.0])
-                                .min_col_width(240.0)
+                                .spacing([24.0, 8.0])
+                                .min_col_width(220.0)
                                 .show(ui, |ui| {
                                     for action in actions.iter().copied() {
-                                        ui.label(action_name(language, action));
+                                        ui.label(
+                                            RichText::new(action_name(language, action))
+                                                .color(palette.text_primary),
+                                        );
                                         match shortcut_for(&hotkeys, action, language) {
-                                            Some(shortcut) => {
-                                                ui.label(RichText::new(shortcut).strong());
-                                            }
+                                            Some(shortcut) => paint_key_cap(ui, &shortcut, palette),
                                             None => {
                                                 ui.label(
                                                     RichText::new(text(
@@ -512,6 +522,7 @@ impl UiState {
                                                         "Non assegnata",
                                                         "Unassigned",
                                                     ))
+                                                    .italics()
                                                     .color(palette.text_secondary),
                                                 );
                                             }
@@ -519,11 +530,12 @@ impl UiState {
                                         ui.end_row();
                                     }
                                 });
-                            ui.add_space(12.0);
                         });
                     }
                 });
-            ui.add_space(6.0);
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(4.0);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button(text(language, "Chiudi", "Close")).clicked() {
                     close = true;
@@ -537,13 +549,15 @@ impl UiState {
     }
 
     fn actions_page(&mut self, ui: &mut Ui, intents: &mut Vec<UiIntent>) {
+        let palette = Palette::of(ui);
         egui::ScrollArea::vertical().show(ui, |ui| {
             for (id, italian, english, actions) in action_groups() {
                 ui.push_id(id, |ui| {
                     ui.label(
                         RichText::new(text(self.config.language, italian, english))
                             .strong()
-                            .size(15.0),
+                            .size(15.0)
+                            .color(palette.text_primary),
                     );
                     ui.add_space(5.0);
                     let columns = action_column_count(ui.available_width());
@@ -1097,6 +1111,23 @@ pub fn surface_frame(ui: &Ui) -> egui::Frame {
 }
 
 type ActionGroup = (&'static str, &'static str, &'static str, &'static [Action]);
+
+/// Draws a shortcut the way a key looks: a tinted cap with a hairline around it.
+///
+/// The keys are what someone scans the list for, so they need to be findable
+/// without reading the names next to them. Plain bold text will not do it: egui
+/// takes the colour of bold text from the pressed-widget style, which is white
+/// on both themes, and white is invisible on a light surface.
+fn paint_key_cap(ui: &mut Ui, shortcut: &str, palette: Palette) {
+    egui::Frame::new()
+        .fill(palette.brand_soft)
+        .stroke(Stroke::new(1.0, palette.border))
+        .corner_radius(6)
+        .inner_margin(egui::Margin::symmetric(8, 3))
+        .show(ui, |ui| {
+            ui.label(RichText::new(shortcut).size(12.5).color(palette.brand_text));
+        });
+}
 
 fn action_column_count(available_width: f32) -> usize {
     (((available_width + ACTION_CARD_SPACING) / (ACTION_CARD_MIN_WIDTH + ACTION_CARD_SPACING))
