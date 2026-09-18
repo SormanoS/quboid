@@ -732,7 +732,27 @@ fn every_text_colour_is_readable_on_every_surface() {
             palette.text_primary,
             palette.brand_soft,
         );
+        assert_readable(
+            &format!("{theme} key cap text on its own cap"),
+            palette.brand_text,
+            palette.brand_soft,
+        );
     }
+}
+
+/// egui takes the colour of bold text from the pressed-widget style, which this
+/// theme paints white on both themes. Bold text with no colour of its own is
+/// therefore white on white in the light theme, which is how the shortcut list
+/// shipped its headings invisible.
+#[test]
+fn bold_text_needs_a_colour_of_its_own_to_be_readable() {
+    let light = style(false).visuals;
+
+    assert_eq!(light.strong_text_color(), Palette::LIGHT.on_brand);
+    assert!(
+        quboid_ui::theme::contrast_ratio(light.strong_text_color(), Palette::LIGHT.surface) < 4.5,
+        "the light theme no longer needs an explicit colour on bold text"
+    );
 }
 
 #[test]
