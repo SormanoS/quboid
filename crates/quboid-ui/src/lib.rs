@@ -252,6 +252,12 @@ impl UiState {
                 )
                 .to_owned()
             }
+            RuntimeEvent::NothingToUndo => text(
+                self.config.language,
+                "Niente da annullare",
+                "Nothing to undo",
+            )
+            .to_owned(),
             RuntimeEvent::HotkeyConflict { action } => format!(
                 "{}: {}",
                 text(

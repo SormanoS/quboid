@@ -136,6 +136,8 @@ pub enum RuntimeEvent {
     },
     /// The user asked to see every shortcut at once.
     ShortcutsRequested,
+    /// Undo was asked for a window that has nothing left to take back.
+    NothingToUndo,
     HotkeyConflict {
         action: Action,
     },

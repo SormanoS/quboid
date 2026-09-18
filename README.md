@@ -42,7 +42,7 @@ it from controlling elevated windows.
 - Windows put back where they were when the monitors change, as after a dock or
   an undock
 - Configurable global shortcuts, one action per shortcut
-- A read-only list of every shortcut, on `Ctrl+Alt+/`, which opens even when
+- A read-only list of every shortcut, on `Ctrl+Alt+S`, which opens even when
   Quboid is in the notification area
 - Edge and corner drag snapping with a non-interactive overlay
 - A gap that keeps its size on every monitor, whatever each one is scaled to
