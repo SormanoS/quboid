@@ -52,6 +52,7 @@ fn system_actions_do_not_claim_a_geometric_target() {
         Action::Undo,
         Action::NextMonitor,
         Action::PreviousMonitor,
+        Action::ShowShortcuts,
     ] {
         assert_eq!(LayoutEngine::target(action, current, work), None);
     }

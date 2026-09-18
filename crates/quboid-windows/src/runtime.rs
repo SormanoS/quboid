@@ -425,12 +425,21 @@ fn unregister_hotkeys(hotkeys: &[RegisteredHotkey]) {
 }
 
 fn apply_and_report(action: Action, windows: &mut WindowManager, events: &Sender<RuntimeEvent>) {
+    if action == Action::ShowShortcuts {
+        // Nothing to place: this one asks the host to teach, and it has to work
+        // even when no window is eligible.
+        let _ = events.send(RuntimeEvent::ShortcutsRequested);
+        return;
+    }
     match windows.apply(action) {
         Ok(rect) => {
             let _ = events.send(RuntimeEvent::Applied { action, rect });
         }
         Err(ApplyError::NoActiveWindow) => {
             let _ = events.send(RuntimeEvent::NoActiveWindow);
+        }
+        Err(ApplyError::NothingToUndo) => {
+            let _ = events.send(RuntimeEvent::NothingToUndo);
         }
         Err(ApplyError::Windows(error)) if error.code().0 == 5 => {
             let _ = events.send(RuntimeEvent::AccessDenied);
@@ -481,7 +490,7 @@ impl WindowManager {
             return self.undo(hwnd, process_id);
         }
         if action == Action::Restore {
-            self.push_undo(hwnd, process_id)?;
+            self.push_undo(hwnd, process_id);
             self.arrangements.remove(&(hwnd.0 as usize));
             if let Some(saved) = self.placements.remove(&(hwnd.0 as usize))
                 && saved.process_id == process_id
@@ -501,7 +510,7 @@ impl WindowManager {
         if action == Action::Maximize {
             // A maximized window follows the monitor it is on, so nothing about
             // its rectangle is worth putting back.
-            self.push_undo(hwnd, process_id)?;
+            self.push_undo(hwnd, process_id);
             self.arrangements.remove(&(hwnd.0 as usize));
             unsafe {
                 let _ = ShowWindow(hwnd, SW_MAXIMIZE);
@@ -550,7 +559,7 @@ impl WindowManager {
         };
 
         let outer_target = geometry.outer_for_visible(target);
-        self.push_undo(hwnd, process_id)?;
+        self.push_undo(hwnd, process_id);
         unsafe {
             let _ = ShowWindow(hwnd, SW_RESTORE);
             SetWindowPos(
@@ -579,7 +588,7 @@ impl WindowManager {
         }
         let process_id = window_process_id(hwnd);
         self.remember_placement(hwnd, process_id)?;
-        self.push_undo(hwnd, process_id)?;
+        self.push_undo(hwnd, process_id);
         place_window(hwnd, target)?;
         if let Ok(monitors) = enumerate_monitors() {
             self.track_arrangement(hwnd, process_id, target, &monitors);
@@ -630,13 +639,16 @@ impl WindowManager {
         };
 
         let mut restored = 0;
+        // Every remembered placement is in workspace coordinates of a monitor
+        // set that has just changed, so putting one back now would drop the
+        // window somewhere that no longer exists. The history starts over.
+        self.undo.clear();
         for (key, arrangement) in std::mem::take(&mut self.arrangements) {
             let hwnd = HWND(key as *mut core::ffi::c_void);
             if !unsafe { IsWindow(Some(hwnd)) }.as_bool()
                 || window_process_id(hwnd) != arrangement.process_id
             {
                 self.placements.remove(&key);
-                self.undo.remove(&key);
                 continue;
             }
 
@@ -702,8 +714,14 @@ impl WindowManager {
     /// also carries whether the window was maximized or minimized: undoing a
     /// maximize has to give back a maximized window, not one the size of the
     /// screen.
-    fn push_undo(&mut self, hwnd: HWND, process_id: u32) -> Result<(), ApplyError> {
-        let placement = window_placement(hwnd)?;
+    ///
+    /// Losing a step of history is not a reason to refuse the placement the user
+    /// asked for, so a window that will not report its own position is skipped
+    /// rather than treated as a failure.
+    fn push_undo(&mut self, hwnd: HWND, process_id: u32) {
+        let Ok(placement) = window_placement(hwnd) else {
+            return;
+        };
         let key = hwnd.0 as usize;
         if self.undo.len() >= UNDO_WINDOW_LIMIT && !self.undo.contains_key(&key) {
             self.undo.retain(|key, stack| {
@@ -727,23 +745,22 @@ impl WindowManager {
             stack.placements.remove(0);
         }
         stack.placements.push(placement);
-        Ok(())
     }
 
     /// Puts the active window back where it was before the last placement, and
-    /// does nothing when there is no placement left to take back.
+    /// says so when there is no placement left to take back.
     fn undo(&mut self, hwnd: HWND, process_id: u32) -> Result<Option<Rect>, ApplyError> {
         let key = hwnd.0 as usize;
         let Some(stack) = self.undo.get_mut(&key) else {
-            return Ok(None);
+            return Err(ApplyError::NothingToUndo);
         };
         if stack.process_id != process_id {
             self.undo.remove(&key);
-            return Ok(None);
+            return Err(ApplyError::NothingToUndo);
         }
         let Some(placement) = stack.placements.pop() else {
             self.undo.remove(&key);
-            return Ok(None);
+            return Err(ApplyError::NothingToUndo);
         };
         if stack.placements.is_empty() {
             self.undo.remove(&key);
@@ -1084,6 +1101,8 @@ fn monitor_dpi(monitor: HMONITOR) -> u32 {
 enum ApplyError {
     #[error("there is no active window")]
     NoActiveWindow,
+    #[error("there is nothing left to take back")]
+    NothingToUndo,
     #[error("the active window has no monitor")]
     NoMonitor,
     #[error("window geometry is invalid")]
