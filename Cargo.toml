@@ -30,7 +30,7 @@ thiserror = "2.0.16"
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-tray-icon = "0.24.2"
+tray-icon = "0.25.1"
 windows = { version = "0.62.2", features = [
     "ApplicationModel",
     "Foundation",
