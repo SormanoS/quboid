@@ -143,6 +143,14 @@ pub enum RuntimeEvent {
     HotkeyConflict {
         action: Action,
     },
+    /// Every shortcut Quboid asked Windows for and does not hold right now.
+    ///
+    /// Sent whenever that set changes, including back to empty once a
+    /// conflict is resolved, so a host can show the current state instead of
+    /// counting [`RuntimeEvent::HotkeyConflict`] reports that may repeat.
+    HotkeysUnavailable {
+        actions: Vec<Action>,
+    },
     NoActiveWindow,
     AccessDenied,
     Failed(String),

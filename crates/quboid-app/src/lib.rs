@@ -223,7 +223,6 @@ pub fn run(profile: Profile) -> eframe::Result {
                 appearance_provider,
                 appearance,
                 next_appearance_check: Instant::now() + APPEARANCE_POLL_INTERVAL,
-                unavailable_shortcuts: 0,
             }))
         }),
     )
@@ -242,8 +241,6 @@ struct DesktopApp {
     appearance_provider: WindowsAppearanceProvider,
     appearance: WindowsAppearance,
     next_appearance_check: Instant,
-    /// How many shortcuts Quboid asked Windows for and did not get.
-    unavailable_shortcuts: usize,
 }
 
 impl eframe::App for DesktopApp {
@@ -274,11 +271,9 @@ impl eframe::App for DesktopApp {
                     ?action,
                     "another program already owns this shortcut; Quboid will not receive it"
                 );
-                self.unavailable_shortcuts += 1;
-                self.tray.set_unavailable_shortcuts(
-                    self.ui.config().language,
-                    self.unavailable_shortcuts,
-                );
+            }
+            if let RuntimeEvent::HotkeysUnavailable { actions } = &event {
+                self.tray.set_unavailable_shortcuts(actions.len());
             }
             self.ui.handle_event(event);
         }
@@ -445,13 +440,18 @@ struct TrayControls {
     open_id: MenuId,
     quit_id: MenuId,
     product: &'static str,
+    language: Language,
+    /// How many shortcuts Quboid asked Windows for and does not hold.
+    unavailable_shortcuts: usize,
 }
 
 impl TrayControls {
-    fn set_language(&self, language: Language) {
+    fn set_language(&mut self, language: Language) {
         let (open, quit) = tray_labels(language, self.product);
         self.open.set_text(open);
         self.quit.set_text(quit);
+        self.language = language;
+        self.refresh_tooltip();
     }
 
     /// Says on the tray icon how many shortcuts Quboid failed to claim.
@@ -460,8 +460,14 @@ impl TrayControls {
     /// which nobody is looking at: Quboid starts in the tray, and the shortcut
     /// that would open it is one of the ones that just failed. The tooltip is
     /// the only surface left that the person can still reach.
-    fn set_unavailable_shortcuts(&self, language: Language, count: usize) {
-        let tooltip = unavailable_shortcuts_tooltip(language, self.product, count);
+    fn set_unavailable_shortcuts(&mut self, count: usize) {
+        self.unavailable_shortcuts = count;
+        self.refresh_tooltip();
+    }
+
+    fn refresh_tooltip(&self) {
+        let tooltip =
+            unavailable_shortcuts_tooltip(self.language, self.product, self.unavailable_shortcuts);
         if let Err(error) = self.icon.set_tooltip(Some(tooltip)) {
             tracing::debug!(%error, "tray tooltip could not be updated");
         }
@@ -516,6 +522,8 @@ fn create_tray_icon(language: Language, product: &'static str) -> Result<TrayCon
         open_id,
         quit_id,
         product,
+        language,
+        unavailable_shortcuts: 0,
     })
 }
 

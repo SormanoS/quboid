@@ -221,6 +221,9 @@ impl UiState {
 
     pub fn handle_event(&mut self, event: RuntimeEvent) {
         self.status = match event {
+            // A summary of conflicts already reported one by one; the host
+            // shows it outside this window.
+            RuntimeEvent::HotkeysUnavailable { .. } => return,
             RuntimeEvent::Ready => text(
                 self.config.language,
                 "Runtime Windows pronto",

@@ -100,15 +100,18 @@ try {
     }
 
     # Stopping the running Quboid during an upgrade needs the Util extension,
-    # which the WiX CLI does not ship with. Adding it is idempotent.
-    & $Wix extension add -g "WixToolset.Util.wixext" @WixArguments
+    # which the WiX CLI does not ship with. It is pinned to the CLI's own
+    # version, since the latest extension may not load into an older CLI.
+    # Adding it is idempotent, but the first run needs network access.
+    $UtilExtension = "WixToolset.Util.wixext/$($WixVersion -replace '\+.*$', '')"
+    & $Wix extension add -g $UtilExtension @WixArguments
     if ($LASTEXITCODE -ne 0) {
-        throw "The WiX Util extension could not be installed."
+        throw "The WiX Util extension $UtilExtension could not be installed."
     }
 
     & $Wix build "packaging\wix\Quboid.wxs" `
         @WixArguments `
-        -ext "WixToolset.Util.wixext" `
+        -ext $UtilExtension `
         -arch x64 `
         -d "SourceDir=$Stage" `
         -d "Version=$Version" `
