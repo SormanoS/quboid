@@ -9,7 +9,7 @@ of the GitHub release and the "What's new in this version" text of the
 Microsoft Store listing, which accepts plain text only: write short bullets,
 avoid tables and images, and keep each section under 1500 characters.
 
-## [0.1.3]
+## [0.1.3] - 2026-09-24
 
 ### Added
 
