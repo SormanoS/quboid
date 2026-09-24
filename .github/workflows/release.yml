@@ -76,6 +76,12 @@ jobs:
           "store=$Store" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
           "tagged=$($Tagged.ToString().ToLower())" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
 
+      # The changelogs are what the GitHub release and the Store listing say
+      # about this version, so a version neither of them describes stops here,
+      # before anything is built.
+      - name: Check the changelogs
+        run: .\scripts\release-notes.ps1 -Version ${{ steps.version.outputs.version }} -Check
+
       - name: Build the release executable
         run: cargo build --locked --release --target x86_64-pc-windows-msvc
 
@@ -94,13 +100,27 @@ jobs:
         if: steps.version.outputs.store == 'true'
         run: .\scripts\package-msix.ps1 -Version ${{ steps.version.outputs.version }} -SkipBuild
 
+      # The Store listing takes plain text, one text per language.
+      - name: Write the Store release notes
+        if: steps.version.outputs.store == 'true'
+        run: |
+          foreach ($Language in "en", "it") {
+              .\scripts\release-notes.ps1 `
+                -Version ${{ steps.version.outputs.version }} `
+                -Language $Language `
+                -Format Store `
+                -OutFile "dist/store-notes.$Language.txt"
+          }
+
       - name: Upload the MSIX
         if: steps.version.outputs.store == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: quboid-${{ steps.version.outputs.version }}-msix
           if-no-files-found: error
-          path: dist/*.msix
+          path: |
+            dist/*.msix
+            dist/store-notes.*.txt
 
       - name: Upload the artifacts
         uses: actions/upload-artifact@v7
@@ -120,8 +140,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          $English = .\scripts\release-notes.ps1 -Version $env:VERSION -Language en
+          $Italian = .\scripts\release-notes.ps1 -Version $env:VERSION -Language it
           $Notes = @"
-          Quboid $env:VERSION for Windows on x86_64.
+          $($English -join "`n")
+
+          <details>
+          <summary>Italiano</summary>
+
+          $($Italian -join "`n")
+
+          </details>
+
+          ## Downloads
 
           - ``Quboid-$env:VERSION-windows-x64.msi``: per-user installer, no administrator rights needed.
           - ``Quboid-$env:VERSION-windows-x64-portable.zip``: portable build that keeps its configuration next to the executable.
@@ -130,12 +161,14 @@ jobs:
 
           These binaries are unsigned, so Windows SmartScreen warns the first time you run them.
           "@
+          $Encoding = New-Object System.Text.UTF8Encoding $false
+          [System.IO.File]::WriteAllText("$PWD/dist/release-notes.md", $Notes, $Encoding)
           gh release create "$env:VERSION" `
             "dist/Quboid-$env:VERSION-windows-x64.msi" `
             "dist/Quboid-$env:VERSION-windows-x64-portable.zip" `
             "dist/SHA256SUMS.txt" `
             --title "Quboid $env:VERSION" `
-            --notes $Notes `
+            --notes-file "dist/release-notes.md" `
             --verify-tag
 
   # Partner Center still owns the parts an API cannot create: the reserved name,
@@ -152,6 +185,12 @@ jobs:
     if: needs.release.outputs.store == 'true'
     runs-on: windows-latest
     steps:
+      # Only the scripts are needed: the package itself comes from the
+      # release job, which built and verified it.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+
       - uses: actions/download-artifact@v8
         with:
           name: quboid-${{ needs.release.outputs.version }}-msix
@@ -193,15 +232,44 @@ jobs:
             --clientId ${{ secrets.STORE_CLIENT_ID }} `
             --clientSecret ${{ secrets.STORE_CLIENT_SECRET }}
 
-      # This uploads the package, commits the draft and starts certification,
-      # which Microsoft runs asynchronously; poll reports the outcome, so a
-      # rejection fails the job instead of passing silently.
-      - name: Submit the MSIX
+      # This uploads the package into a draft and stops there, so the draft
+      # can take the release notes before it is committed.
+      - name: Upload the MSIX
         if: steps.credentials.outputs.configured == 'true'
         env:
           VERSION: ${{ needs.release.outputs.version }}
         run: |
-          msstore publish "dist/Quboid-$env:VERSION-windows-x64.msix" -id ${{ secrets.STORE_PRODUCT_ID }}
+          msstore publish "dist/Quboid-$env:VERSION-windows-x64.msix" -id ${{ secrets.STORE_PRODUCT_ID }} --noCommit
+          if ($LASTEXITCODE -ne 0) {
+              throw "The Store submission failed."
+          }
+
+      # "What's new in this version" comes from the changelogs, in the
+      # language of each listing. Every other field of the draft goes back to
+      # Partner Center untouched.
+      - name: Write the release notes into the listings
+        if: steps.credentials.outputs.configured == 'true'
+        run: |
+          msstore submission get ${{ secrets.STORE_PRODUCT_ID }} > dist/submission.txt
+          if ($LASTEXITCODE -ne 0) {
+              throw "The draft submission could not be read."
+          }
+          .\scripts\set-store-release-notes.ps1 `
+            -SubmissionPath dist/submission.txt `
+            -NotesDirectory dist `
+            -OutFile dist/submission.json
+          msstore submission updateMetadata ${{ secrets.STORE_PRODUCT_ID }} dist/submission.json
+          if ($LASTEXITCODE -ne 0) {
+              throw "The release notes could not be saved into the draft."
+          }
+
+      # Committing starts certification, which Microsoft runs asynchronously;
+      # poll reports the outcome, so a rejection fails the job instead of
+      # passing silently.
+      - name: Submit the MSIX
+        if: steps.credentials.outputs.configured == 'true'
+        run: |
+          msstore submission publish ${{ secrets.STORE_PRODUCT_ID }}
           if ($LASTEXITCODE -ne 0) {
               throw "The Store submission failed."
           }

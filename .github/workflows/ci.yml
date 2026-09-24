@@ -41,6 +41,11 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      # A version bump without its changelog entries would only be caught
+      # when the release is tagged; catch it on the pull request instead.
+      - name: Check the changelogs
+        run: .\scripts\release-notes.ps1 -Check
+
       - name: Lint
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
