@@ -1,12 +1,52 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="Quboid"
     Manufacturer="Quboid contributors"
     Version="$(var.Version)"
     UpgradeCode="{87C56635-D3B0-4E65-9877-B97FF7BE60D5}"
     Scope="perUser">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Quboid is already installed." />
+    <!-- The previous version is removed only once this one is in place. By
+         then CloseApplication below has stopped the running Quboid, so the
+         removal never meets a file in use: removing it first would make
+         Windows wait on, or ask about, a process that does not answer
+         Restart Manager. Every file keeps its component, so nothing is lost
+         when the old version lets go of them. -->
+    <MajorUpgrade
+      Schedule="afterInstallExecute"
+      DowngradeErrorMessage="A newer version of Quboid is already installed." />
     <MediaTemplate EmbedCab="yes" />
+
+    <!-- An upgrade replaces the executable without stopping what is running,
+         and Quboid lives in the tray where nobody thinks to close it. The old
+         process keeps every global shortcut it registered, so the new one
+         would start powerless. Stop it before the files are swapped; the match
+         is by name, so a portable copy or a development build is stopped too.
+         A version being removed by an upgrade leaves that to the version
+         replacing it, which is the one that knows to start Quboid again. -->
+    <util:CloseApplication
+      Id="CloseRunningQuboid"
+      Target="quboid-app.exe"
+      CloseMessage="no"
+      TerminateProcess="0"
+      RebootPrompt="no"
+      Property="QUBOIDWASRUNNING"
+      Condition="NOT UPGRADINGPRODUCTCODE" />
+
+    <!-- Quboid that was running before the upgrade is running after it, so an
+         update does not silently leave the shortcuts without an owner. -->
+    <CustomAction
+      Id="RelaunchQuboid"
+      Directory="INSTALLFOLDER"
+      ExeCommand="&quot;[#QuboidExe]&quot;"
+      Return="asyncNoWait" />
+
+    <InstallExecuteSequence>
+      <Custom
+        Action="RelaunchQuboid"
+        After="InstallFinalize"
+        Condition="QUBOIDWASRUNNING AND NOT (REMOVE~=&quot;ALL&quot;)" />
+    </InstallExecuteSequence>
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="INSTALLFOLDER" Name="Quboid" />
