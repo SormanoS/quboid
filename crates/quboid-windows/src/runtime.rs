@@ -157,6 +157,8 @@ fn run_message_loop(
 
     let mut hotkeys = register_hotkeys(&config, &events);
     let mut hotkeys_suspended = false;
+    let mut reported_unavailable = Vec::new();
+    report_unavailable_hotkeys(&hotkeys, &mut reported_unavailable, &events);
     // A second Quboid posts to this window instead of starting up beside this
     // one and taking half the shortcuts with it.
     let signal_window = crate::instance::SignalWindow::new();
@@ -237,6 +239,9 @@ fn run_message_loop(
             Ok(RuntimeCommand::UpdateConfig(updated)) => match updated.validate() {
                 Ok(()) => {
                     reconcile_hotkeys(&mut hotkeys, &updated, &events, !hotkeys_suspended);
+                    if !hotkeys_suspended {
+                        report_unavailable_hotkeys(&hotkeys, &mut reported_unavailable, &events);
+                    }
                     windows.update_config(&updated);
                     if !updated.restore_on_display_change {
                         displays = None;
@@ -267,6 +272,11 @@ fn run_message_loop(
                 } else if !suspended && hotkeys_suspended {
                     resume_hotkeys(&mut hotkeys, &events);
                     hotkeys_suspended = false;
+                }
+                // A suspension is deliberate and not worth reporting, but a
+                // failed one resumes on the spot and may have lost a shortcut.
+                if !hotkeys_suspended {
+                    report_unavailable_hotkeys(&hotkeys, &mut reported_unavailable, &events);
                 }
             }
             Ok(RuntimeCommand::Stop) | Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
@@ -374,6 +384,28 @@ fn reconcile_hotkeys(
             registered: is_registered,
             binding: binding.clone(),
         });
+    }
+}
+
+/// Tells the host which shortcuts Quboid does not hold, whenever that changes.
+///
+/// Conflicts are reported one by one and again on every resume, so they cannot
+/// be counted; this is the state they add up to.
+fn report_unavailable_hotkeys(
+    hotkeys: &[RegisteredHotkey],
+    reported: &mut Vec<Action>,
+    events: &Sender<RuntimeEvent>,
+) {
+    let unavailable = hotkeys
+        .iter()
+        .filter(|hotkey| !hotkey.registered)
+        .map(|hotkey| hotkey.binding.action)
+        .collect::<Vec<_>>();
+    if unavailable != *reported {
+        let _ = events.send(RuntimeEvent::HotkeysUnavailable {
+            actions: unavailable.clone(),
+        });
+        *reported = unavailable;
     }
 }
 

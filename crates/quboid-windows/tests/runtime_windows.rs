@@ -408,6 +408,65 @@ fn suspending_hotkeys_releases_them_until_the_runtime_resumes() {
 
 #[test]
 #[serial]
+fn the_unavailable_shortcuts_are_reported_as_a_state_not_a_tally() {
+    let mut config = base_config();
+    config.hotkeys.push(HotkeyBinding {
+        action: Action::Center,
+        modifiers: 0x0002 | 0x0001,
+        virtual_key: 0x7B,
+    });
+    let _owner = start_runtime(config.clone());
+    let contender = Runtime::start(config.clone()).unwrap();
+
+    assert!(matches!(
+        receive_matching(&contender, |event| matches!(
+            event,
+            RuntimeEvent::HotkeysUnavailable { .. }
+        )),
+        RuntimeEvent::HotkeysUnavailable { actions } if actions == vec![Action::Center]
+    ));
+    receive_matching(&contender, |event| matches!(event, RuntimeEvent::Ready));
+
+    // Suspending and resuming repeats the conflict, but not the state.
+    for suspended in [true, false] {
+        contender
+            .commands()
+            .send(RuntimeCommand::SetHotkeysSuspended(suspended))
+            .unwrap();
+    }
+    contender
+        .commands()
+        .send(RuntimeCommand::ApplyArea(INVALID_AREA))
+        .unwrap();
+    let events = contender.events();
+    loop {
+        match events.recv_timeout(EVENT_TIMEOUT).unwrap() {
+            RuntimeEvent::HotkeyConflict { .. } => {}
+            RuntimeEvent::Failed(_) => break,
+            event => panic!("unexpected runtime event: {event:?}"),
+        }
+    }
+
+    // Moving the action off the taken combination clears the state.
+    let mut resolved = config;
+    resolved
+        .hotkeys
+        .retain(|binding| binding.action != Action::Center);
+    contender
+        .commands()
+        .send(RuntimeCommand::UpdateConfig(resolved))
+        .unwrap();
+    assert!(matches!(
+        receive_matching(&contender, |event| matches!(
+            event,
+            RuntimeEvent::HotkeysUnavailable { .. }
+        )),
+        RuntimeEvent::HotkeysUnavailable { actions } if actions.is_empty()
+    ));
+}
+
+#[test]
+#[serial]
 fn maximize_and_restore_publish_state_changes_and_update_the_window() {
     let runtime = start_runtime(base_config());
     let window = TestWindow::new();

@@ -12,7 +12,8 @@ use windows::{
         Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, HANDLE, HWND, LPARAM, WPARAM},
         System::Threading::CreateMutexW,
         UI::WindowsAndMessaging::{
-            FindWindowExW, HWND_MESSAGE, PostMessageW, RegisterWindowMessageW,
+            AllowSetForegroundWindow, FindWindowExW, GetWindowThreadProcessId, HWND_MESSAGE,
+            PostMessageW, RegisterWindowMessageW,
         },
     },
     core::{HSTRING, w},
@@ -92,6 +93,13 @@ pub fn show_running_instance() -> bool {
     };
     if hwnd.is_invalid() {
         return false;
+    }
+    // Windows only lets the process the user just started take the foreground.
+    // Passing that right on is what lets the running Quboid come to the front
+    // instead of flashing on the taskbar.
+    let mut process_id = 0;
+    if unsafe { GetWindowThreadProcessId(hwnd, Some(&mut process_id)) } != 0 {
+        let _ = unsafe { AllowSetForegroundWindow(process_id) };
     }
     unsafe { PostMessageW(Some(hwnd), show_message(), WPARAM(0), LPARAM(0)) }.is_ok()
 }
