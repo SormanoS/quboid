@@ -221,6 +221,9 @@ impl UiState {
 
     pub fn handle_event(&mut self, event: RuntimeEvent) {
         self.status = match event {
+            // A summary of conflicts already reported one by one; the host
+            // shows it outside this window.
+            RuntimeEvent::HotkeysUnavailable { .. } => return,
             RuntimeEvent::Ready => text(
                 self.config.language,
                 "Runtime Windows pronto",
@@ -252,6 +255,12 @@ impl UiState {
                 )
                 .to_owned()
             }
+            RuntimeEvent::ActivationRequested => text(
+                self.config.language,
+                "Quboid era già in esecuzione",
+                "Quboid was already running",
+            )
+            .to_owned(),
             RuntimeEvent::NothingToUndo => text(
                 self.config.language,
                 "Niente da annullare",

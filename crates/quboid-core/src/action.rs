@@ -136,10 +136,20 @@ pub enum RuntimeEvent {
     },
     /// The user asked to see every shortcut at once.
     ShortcutsRequested,
+    /// A second Quboid was started and handed its launch over to this one.
+    ActivationRequested,
     /// Undo was asked for a window that has nothing left to take back.
     NothingToUndo,
     HotkeyConflict {
         action: Action,
+    },
+    /// Every shortcut Quboid asked Windows for and does not hold right now.
+    ///
+    /// Sent whenever that set changes, including back to empty once a
+    /// conflict is resolved, so a host can show the current state instead of
+    /// counting [`RuntimeEvent::HotkeyConflict`] reports that may repeat.
+    HotkeysUnavailable {
+        actions: Vec<Action>,
     },
     NoActiveWindow,
     AccessDenied,

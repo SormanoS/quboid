@@ -9,8 +9,9 @@ use quboid_core::{
 };
 use quboid_ui::{UiExtension, UiIntent, UiState, theme};
 use quboid_windows::{
-    RegistrySetting, Runtime, RuntimeAdapters, WindowsAppearance, WindowsAppearanceProvider,
-    WindowsTheme, set_launch_at_login, system_language,
+    RegistrySetting, Runtime, RuntimeAdapters, SingleInstance, WindowsAppearance,
+    WindowsAppearanceProvider, WindowsTheme, set_launch_at_login, show_running_instance,
+    system_language,
 };
 use tracing_subscriber::EnvFilter;
 use tray_icon::{
@@ -143,6 +144,17 @@ pub fn run(profile: Profile) -> eframe::Result {
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
 
+    // Global shortcuts cannot be shared, so a second Quboid would come up
+    // owning none of them. Hand the launch to the one already running instead.
+    let Some(_instance) = SingleInstance::acquire(product) else {
+        let handed_over = show_running_instance();
+        tracing::info!(
+            handed_over,
+            "another Quboid is already running; this launch was handed over to it"
+        );
+        return Ok(());
+    };
+
     let imported = storage
         .load()
         .expect("Quboid could not load its configuration");
@@ -245,11 +257,23 @@ impl eframe::App for DesktopApp {
         }
 
         while let Ok(event) = self.events.try_recv() {
-            if matches!(event, RuntimeEvent::ShortcutsRequested) {
+            if matches!(
+                event,
+                RuntimeEvent::ShortcutsRequested | RuntimeEvent::ActivationRequested
+            ) {
                 // The shortcut has to work while the window is in the tray:
                 // that is the moment someone needs to be told what is bound.
                 ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            }
+            if let RuntimeEvent::HotkeyConflict { action } = &event {
+                tracing::warn!(
+                    ?action,
+                    "another program already owns this shortcut; Quboid will not receive it"
+                );
+            }
+            if let RuntimeEvent::HotkeysUnavailable { actions } = &event {
+                self.tray.set_unavailable_shortcuts(actions.len());
             }
             self.ui.handle_event(event);
         }
@@ -410,19 +434,53 @@ impl DesktopApp {
 }
 
 struct TrayControls {
-    _icon: TrayIcon,
+    icon: TrayIcon,
     open: MenuItem,
     quit: MenuItem,
     open_id: MenuId,
     quit_id: MenuId,
     product: &'static str,
+    language: Language,
+    /// How many shortcuts Quboid asked Windows for and does not hold.
+    unavailable_shortcuts: usize,
 }
 
 impl TrayControls {
-    fn set_language(&self, language: Language) {
+    fn set_language(&mut self, language: Language) {
         let (open, quit) = tray_labels(language, self.product);
         self.open.set_text(open);
         self.quit.set_text(quit);
+        self.language = language;
+        self.refresh_tooltip();
+    }
+
+    /// Says on the tray icon how many shortcuts Quboid failed to claim.
+    ///
+    /// A shortcut conflict is reported as a status line in the settings window,
+    /// which nobody is looking at: Quboid starts in the tray, and the shortcut
+    /// that would open it is one of the ones that just failed. The tooltip is
+    /// the only surface left that the person can still reach.
+    fn set_unavailable_shortcuts(&mut self, count: usize) {
+        self.unavailable_shortcuts = count;
+        self.refresh_tooltip();
+    }
+
+    fn refresh_tooltip(&self) {
+        let tooltip =
+            unavailable_shortcuts_tooltip(self.language, self.product, self.unavailable_shortcuts);
+        if let Err(error) = self.icon.set_tooltip(Some(tooltip)) {
+            tracing::debug!(%error, "tray tooltip could not be updated");
+        }
+    }
+}
+
+fn unavailable_shortcuts_tooltip(language: Language, product: &str, count: usize) -> String {
+    match (language, count) {
+        (_, 0) => product.to_owned(),
+        (Language::Italian, 1) => format!("{product} — 1 scorciatoia già in uso"),
+        (Language::Italian, count) => format!("{product} — {count} scorciatoie già in uso"),
+        (Language::English, 1) => format!("{product} — 1 shortcut already in use"),
+        (Language::English, count) => format!("{product} — {count} shortcuts already in use"),
     }
 }
 
@@ -458,12 +516,14 @@ fn create_tray_icon(language: Language, product: &'static str) -> Result<TrayCon
         .build()
         .map_err(|error| format!("failed to create tray icon: {error}"))?;
     Ok(TrayControls {
-        _icon: tray,
+        icon: tray,
         open,
         quit,
         open_id,
         quit_id,
         product,
+        language,
+        unavailable_shortcuts: 0,
     })
 }
 
@@ -502,7 +562,7 @@ fn apply_windows_style(ctx: &egui::Context, appearance: &WindowsAppearance) {
 
 #[cfg(test)]
 mod tests {
-    use super::{configure_egui, tray_labels};
+    use super::{configure_egui, tray_labels, unavailable_shortcuts_tooltip};
     use quboid_core::Language;
 
     #[test]
@@ -523,6 +583,22 @@ mod tests {
         assert_eq!(
             tray_labels(Language::English, "Quboid"),
             ("Open Quboid".to_owned(), "Exit".to_owned())
+        );
+    }
+
+    #[test]
+    fn the_tray_says_how_many_shortcuts_quboid_did_not_get() {
+        assert_eq!(
+            unavailable_shortcuts_tooltip(Language::Italian, "Quboid", 0),
+            "Quboid"
+        );
+        assert_eq!(
+            unavailable_shortcuts_tooltip(Language::Italian, "Quboid", 1),
+            "Quboid — 1 scorciatoia già in uso"
+        );
+        assert_eq!(
+            unavailable_shortcuts_tooltip(Language::English, "Quboid", 3),
+            "Quboid — 3 shortcuts already in use"
         );
     }
 }

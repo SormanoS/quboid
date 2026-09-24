@@ -503,6 +503,18 @@ fn generated_values_avoid_the_ones_already_taken() {
 }
 
 #[test]
+fn a_second_launch_says_why_no_new_window_appeared() {
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::ActivationRequested);
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let harness = ui_harness(&state, &intents);
+
+    let _status = harness.get_by_label("Quboid era già in esecuzione");
+}
+
+#[test]
 fn runtime_status_is_exposed_to_accessibility_clients() {
     let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     state

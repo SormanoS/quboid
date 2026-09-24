@@ -46,6 +46,11 @@ it from controlling elevated windows.
   Quboid is in the notification area
 - Edge and corner drag snapping with a non-interactive overlay
 - A gap that keeps its size on every monitor, whatever each one is scaled to
+- One Quboid per Windows session: starting it again brings up the settings
+  window of the one already running instead of a second copy that would own
+  none of the shortcuts
+- A notification area icon that says how many shortcuts another program has
+  already taken
 - Italian and English interface, picked from the Windows user locale on first run, tray mode and launch at login
 - Versioned JSON configuration with import/export and portable mode
 
@@ -117,6 +122,7 @@ that section and reporting everything stored beside it as discarded.
 | Visual Studio Build Tools with the C++ workload | The MSVC linker that Rust invokes | Visual Studio Installer, "Desktop development with C++" |
 | Windows SDK | `mt.exe`, which packaging uses to verify the manifest embedded in the executable, and `rc.exe` if the manifest changes | Included in the workload above |
 | WiX Toolset v4 or later | The `.msi` | `dotnet tool install --global wix` |
+| The WiX Util extension, matching the WiX version | Stopping a running Quboid during an upgrade | `scripts\package.ps1` adds it to the global WiX cache itself, which needs network access the first time |
 | A code-signing certificate and `signtool.exe` | Signed releases. Optional: unsigned artifacts build fine, but Windows SmartScreen warns about them | Your certificate authority |
 
 WiX v7 refuses to build until its [Open Source Maintenance Fee](https://wixtoolset.org/osmf/)
@@ -151,7 +157,10 @@ it is the expected one, and writes three files to `dist`:
 
 - `Quboid-<version>-windows-x64.msi`: a per-user installer. It installs into
   `%LOCALAPPDATA%\Quboid`, adds a Start Menu shortcut, upgrades an older version
-  in place and needs no administrator rights;
+  in place and needs no administrator rights. Installing, upgrading or removing
+  it stops every running `quboid-app.exe`, a portable copy or a development
+  build included, because only one of them can own the global shortcuts; an
+  upgrade starts the new version again if Quboid was running before it;
 - `Quboid-<version>-windows-x64-portable.zip`: the executable, this README and
   the licence, plus a `portable.flag` file. That flag is what makes Quboid keep
   its configuration and logs next to the executable instead of under `%APPDATA%`,
@@ -225,7 +234,8 @@ properties of the installer, and reads back the manifest embedded in the shipped
 executable. With `-InstallSmoke` it also installs the MSI silently, checks that
 the executable landed in `%LOCALAPPDATA%\Quboid` and uninstalls it again; it
 refuses to run that step when Quboid is already installed, so it never replaces
-your own installation.
+your own installation. It does stop a Quboid you are running from a portable
+copy or from `cargo run`, as any install of the MSI does.
 
 `.\scripts\test-all.ps1` runs the whole chain: formatting, tests, lints, the
 release build, the Windows end-to-end test, packaging and these checks.
@@ -237,6 +247,27 @@ on unless the tag matches the version in `Cargo.toml`, then publishes the MSI,
 the portable archive and the checksums as a GitHub release and submits the MSIX
 to the Microsoft Store. Tags carry no `v` prefix, so the tag and the version in
 `Cargo.toml` are the same string.
+
+Every version needs a `## [X.Y.Z]` section in both [`CHANGELOG.md`](CHANGELOG.md)
+and [`CHANGELOG.it.md`](CHANGELOG.it.md), written for the people who use Quboid.
+The English and Italian sections become the notes of the GitHub release, and
+their plain-text form becomes the "What's new in this version" of the matching
+Store listing: listings in Italian get the Italian text, every other listing
+the English one. The Store caps that text at 1500 characters. CI checks both
+sections on every pull request and the release workflow checks them again
+before building, so a version bump without its changelog cannot be tagged:
+
+```powershell
+# Check the version in Cargo.toml, as CI does.
+.\scripts\release-notes.ps1 -Check
+
+# Preview what the Store listing will say.
+.\scripts\release-notes.ps1 -Language it -Format Store
+```
+
+To put the notes in, the Store job uploads the package into a draft
+submission, writes the notes into its listings with
+`scripts\set-store-release-notes.ps1`, and only then commits it.
 
 Running the workflow by hand from the Actions tab rehearses all of that without
 publishing anything: it builds, packages and verifies, and stops short of the
