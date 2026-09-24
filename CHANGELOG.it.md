@@ -3,7 +3,7 @@
 Cosa è cambiato in ogni versione di Quboid, per chi lo usa. La versione inglese
 è [`CHANGELOG.md`](CHANGELOG.md); i due file vanno aggiornati insieme.
 
-## [0.1.3]
+## [0.1.3] - 2026-09-24
 
 ### Aggiunto
 
