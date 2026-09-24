@@ -15,6 +15,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 Push-Location $Root
 try {
     cargo fmt --all -- --check
+    & (Join-Path $PSScriptRoot "release-notes.ps1") -Check
     cargo test --workspace -- --test-threads=1
     cargo clippy --workspace --all-targets -- -D warnings
     cargo build --locked --release --target x86_64-pc-windows-msvc
