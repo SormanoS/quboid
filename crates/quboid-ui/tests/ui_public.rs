@@ -165,6 +165,8 @@ fn the_general_sliders_are_wide_enough_to_aim_at_a_value() {
             rect.width()
         );
     }
+    let _percent = harness.get_by_value("5%");
+    assert!(harness.query_by_value("500 /10000").is_none());
 }
 
 #[test]
