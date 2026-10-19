@@ -259,3 +259,36 @@ fn the_gap_is_capped_before_it_is_scaled() {
         LayoutEngine::gap_pixels(quboid_core::MAX_GAP, 192)
     );
 }
+
+#[test]
+fn moving_between_monitors_keeps_the_destination_monitor_gap() {
+    let from = Rect::new(0, 0, 1920, 1080);
+    let to = Rect::new(1920, 0, 1920 + 3840, 2160);
+    let from_gap = LayoutEngine::gap_pixels(12, 96);
+    let to_gap = LayoutEngine::gap_pixels(12, 144);
+    let left_half_with_gap = LayoutEngine::target(Action::LeftHalf, from, from)
+        .unwrap()
+        .inset(from_gap);
+
+    let mapped =
+        LayoutEngine::map_to_monitor_with_gap(left_half_with_gap, from, from_gap, to, to_gap)
+            .unwrap();
+    let expected = LayoutEngine::target(Action::LeftHalf, to, to)
+        .unwrap()
+        .inset(to_gap);
+
+    assert_eq!(mapped, expected);
+}
+
+#[test]
+fn moving_a_freely_positioned_window_between_monitors_does_not_apply_a_gap() {
+    let from = Rect::new(0, 0, 1920, 1080);
+    let to = Rect::new(1920, 0, 1920 + 3840, 2160);
+    let centered =
+        LayoutEngine::target(Action::Center, Rect::new(400, 200, 1200, 800), from).unwrap();
+
+    assert_eq!(
+        LayoutEngine::map_to_monitor_with_gap(centered, from, 12, to, 18),
+        LayoutEngine::map_to_monitor(centered, from, to)
+    );
+}
