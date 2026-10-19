@@ -94,12 +94,33 @@ impl Runtime {
 
     /// Starts the runtime with host-provided snap, shortcut and window adapters.
     pub fn start_with(config: AppConfig, adapters: RuntimeAdapters) -> Result<Self, RuntimeError> {
+        Self::start_inner(config, adapters, None)
+    }
+
+    /// Starts the runtime while treating the given process ID as the host UI
+    /// process whose own settings window should yield to the last active
+    /// external window.
+    pub fn start_for_host(
+        config: AppConfig,
+        adapters: RuntimeAdapters,
+        host_process_id: u32,
+    ) -> Result<Self, RuntimeError> {
+        Self::start_inner(config, adapters, Some(host_process_id))
+    }
+
+    fn start_inner(
+        config: AppConfig,
+        adapters: RuntimeAdapters,
+        host_process_id: Option<u32>,
+    ) -> Result<Self, RuntimeError> {
         config.validate()?;
         let (command_tx, command_rx) = unbounded();
         let (event_tx, event_rx) = unbounded();
         let thread = thread::Builder::new()
             .name("quboid-win32".to_owned())
-            .spawn(move || run_message_loop(config, adapters, command_rx, event_tx))
+            .spawn(move || {
+                run_message_loop(config, adapters, host_process_id, command_rx, event_tx)
+            })
             .map_err(RuntimeError::Thread)?;
 
         Ok(Self {
@@ -140,6 +161,7 @@ pub enum RuntimeError {
 fn run_message_loop(
     config: AppConfig,
     adapters: RuntimeAdapters,
+    host_process_id: Option<u32>,
     commands: Receiver<RuntimeCommand>,
     events: Sender<RuntimeEvent>,
 ) {
@@ -164,7 +186,7 @@ fn run_message_loop(
     let signal_window = crate::instance::SignalWindow::new();
     let show_message = crate::instance::show_message();
     let _ = events.send(RuntimeEvent::Ready);
-    let mut windows = WindowManager::new(window_filter);
+    let mut windows = WindowManager::new(window_filter, host_process_id);
     windows.update_config(&config);
     let mut drag_snap = config
         .drag_snap_enabled
@@ -208,6 +230,8 @@ fn run_message_loop(
         if let Some(drag_snap) = &mut drag_snap {
             drag_snap.process_events(&mut windows, snap.as_mut());
         }
+
+        windows.observe_foreground();
 
         if let Some(displays) = &mut displays
             && displays.settled(Instant::now())
@@ -492,6 +516,13 @@ struct WindowManager {
     placements: HashMap<usize, SavedPlacement>,
     arrangements: HashMap<usize, TrackedArrangement>,
     undo: HashMap<usize, UndoStack>,
+    /// Process ID of the host UI window, if any, which should yield to the
+    /// last eligible window outside that process.
+    host_process_id: Option<u32>,
+    /// The last eligible foreground window outside `host_process_id`, so
+    /// clicking an action card in Quboid's own window places the window the
+    /// user just left instead of Quboid itself.
+    last_active: Option<(usize, u32)>,
     /// The configured gap at 100%: what it comes to in pixels depends on the
     /// monitor the window lands on.
     gap: u16,
@@ -499,11 +530,13 @@ struct WindowManager {
 }
 
 impl WindowManager {
-    fn new(filter: Box<dyn WindowFilter>) -> Self {
+    fn new(filter: Box<dyn WindowFilter>, host_process_id: Option<u32>) -> Self {
         Self {
             placements: HashMap::new(),
             arrangements: HashMap::new(),
             undo: HashMap::new(),
+            host_process_id,
+            last_active: None,
             gap: 0,
             filter,
         }
@@ -517,13 +550,69 @@ impl WindowManager {
         is_eligible_window(hwnd) && self.filter.allows(window_application(hwnd).as_deref())
     }
 
-    fn apply(&mut self, action: Action) -> Result<Option<Rect>, ApplyError> {
+    fn observe_foreground(&mut self) {
+        let Some(host_process_id) = self.host_process_id else {
+            return;
+        };
         let hwnd = unsafe { GetForegroundWindow() };
-        if hwnd.0.is_null() || !self.is_eligible(hwnd) {
-            return Err(ApplyError::NoActiveWindow);
+        if hwnd.0.is_null() {
+            return;
         }
-
         let process_id = window_process_id(hwnd);
+        if process_id != 0 && process_id != host_process_id && self.is_eligible(hwnd) {
+            self.last_active = Some((hwnd.0 as usize, process_id));
+        }
+    }
+
+    #[cfg(test)]
+    fn preferred_handle(
+        &mut self,
+        foreground: usize,
+        foreground_process: u32,
+        self_process: u32,
+    ) -> Option<usize> {
+        if foreground_process != 0 && foreground_process != self_process {
+            self.last_active = Some((foreground, foreground_process));
+            return Some(foreground);
+        }
+        self.last_active
+            .map(|(remembered, _)| remembered)
+            .or((foreground != 0).then_some(foreground))
+    }
+
+    fn target_window(&self) -> Result<(HWND, u32), ApplyError> {
+        let foreground = unsafe { GetForegroundWindow() };
+        if !foreground.0.is_null() {
+            let process_id = window_process_id(foreground);
+            if self.host_process_id == Some(process_id)
+                && let Some((remembered, remembered_process)) = self.last_active
+            {
+                let hwnd = HWND(remembered as *mut core::ffi::c_void);
+                if unsafe { IsWindow(Some(hwnd)) }.as_bool()
+                    && window_process_id(hwnd) == remembered_process
+                    && self.is_eligible(hwnd)
+                {
+                    return Ok((hwnd, remembered_process));
+                }
+            }
+            if self.is_eligible(foreground) {
+                return Ok((foreground, process_id));
+            }
+        }
+        if let Some((remembered, remembered_process)) = self.last_active {
+            let hwnd = HWND(remembered as *mut core::ffi::c_void);
+            if unsafe { IsWindow(Some(hwnd)) }.as_bool()
+                && window_process_id(hwnd) == remembered_process
+                && self.is_eligible(hwnd)
+            {
+                return Ok((hwnd, remembered_process));
+            }
+        }
+        Err(ApplyError::NoActiveWindow)
+    }
+
+    fn apply(&mut self, action: Action) -> Result<Option<Rect>, ApplyError> {
+        let (hwnd, process_id) = self.target_window()?;
         if action == Action::Undo {
             return self.undo(hwnd, process_id);
         }
@@ -709,10 +798,7 @@ impl WindowManager {
     }
 
     fn apply_area(&mut self, bounds: NormalizedRect) -> Result<Rect, ApplyError> {
-        let hwnd = unsafe { GetForegroundWindow() };
-        if hwnd.0.is_null() || !self.is_eligible(hwnd) {
-            return Err(ApplyError::NoActiveWindow);
-        }
+        let (hwnd, _) = self.target_window()?;
         let geometry = window_geometry(hwnd)?;
         let monitors = enumerate_monitors()?;
         let monitor_index = select_monitor(geometry.visible, hwnd, &monitors)?;
@@ -1428,6 +1514,16 @@ mod tests {
 
     fn signature(work: Rect) -> Vec<(String, Rect)> {
         vec![(r"\\.\DISPLAY1".to_owned(), work)]
+    }
+
+    #[test]
+    fn an_active_window_from_another_process_wins_over_quboid_own_window() {
+        let mut manager = WindowManager::new(Box::new(crate::adapters::AllWindows), Some(100));
+        assert_eq!(manager.preferred_handle(10, 100, 100), Some(10));
+        assert_eq!(manager.preferred_handle(20, 200, 100), Some(20));
+        // When Quboid's own window (process 100) takes focus, the remembered
+        // external window (20) is chosen instead.
+        assert_eq!(manager.preferred_handle(10, 100, 100), Some(20));
     }
 
     #[test]
