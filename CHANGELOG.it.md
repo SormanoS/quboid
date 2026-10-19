@@ -3,6 +3,27 @@
 Cosa è cambiato in ogni versione di Quboid, per chi lo usa. La versione inglese
 è [`CHANGELOG.md`](CHANGELOG.md); i due file vanno aggiornati insieme.
 
+## [1.0.0] - 2026-10-19
+
+### Aggiunto
+
+- Filtro delle scorciatoie per nome dell'azione o combinazione di tasti e
+  pulsante per ripristinare le scorciatoie predefinite con un clic.
+- Le scorciatoie già occupate da un altro programma sono segnalate direttamente
+  nella pagina Scorciatoie e nell'elenco `Ctrl+Alt+S`.
+
+### Modificato
+
+- La soglia di snap è mostrata e regolabile in percentuale (`1%`–`15%`) nelle
+  impostazioni generali.
+
+### Corretto
+
+- Cliccare una card nella finestra di Quboid posiziona l'ultima finestra
+  esterna attiva invece di fallire perché Quboid è in primo piano.
+- Spostare una finestra sul monitor successivo o precedente mantiene lo spazio
+  configurato alla scala del monitor di destinazione.
+
 ## [0.1.3] - 2026-09-24
 
 ### Aggiunto
