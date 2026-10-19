@@ -180,7 +180,7 @@ pub fn run(profile: Profile) -> eframe::Result {
     {
         tracing::error!(%error, "could not synchronize launch-at-login setting");
     }
-    let runtime = Runtime::start_with(config.clone(), adapters)
+    let runtime = Runtime::start_for_host(config.clone(), adapters, std::process::id())
         .expect("Quboid could not start its Windows runtime");
     let commands = runtime.commands();
     let events = runtime.events();
