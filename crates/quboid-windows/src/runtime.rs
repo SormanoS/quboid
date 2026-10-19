@@ -568,10 +568,12 @@ impl WindowManager {
                 } else {
                     (monitor_index + monitors.len() - 1) % monitors.len()
                 };
-                LayoutEngine::map_to_monitor(
+                LayoutEngine::map_to_monitor_with_gap(
                     geometry.visible,
                     current_work,
+                    LayoutEngine::gap_pixels(self.gap, monitors[monitor_index].dpi),
                     monitors[target_index].work,
+                    LayoutEngine::gap_pixels(self.gap, monitors[target_index].dpi),
                 )
             }
             Action::NextMonitor | Action::PreviousMonitor => Some(geometry.visible),

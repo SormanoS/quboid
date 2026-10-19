@@ -259,6 +259,49 @@ impl LayoutEngine {
         ))
     }
 
+    /// Maps a window from one monitor's work area to another's while keeping
+    /// the gap around an inset placement at `to_gap` pixels on the destination
+    /// monitor instead of scaling `from_gap` with the work areas.
+    pub fn map_to_monitor_with_gap(
+        current: Rect,
+        from: Rect,
+        from_gap: i32,
+        to: Rect,
+        to_gap: i32,
+    ) -> Option<Rect> {
+        if !current.is_valid() || !from.is_valid() || !to.is_valid() {
+            return None;
+        }
+        let from_gap = from_gap.max(0);
+        let to_gap = to_gap.max(0);
+        if (from_gap > 0 || to_gap > 0)
+            && from.width() > from_gap * 2
+            && from.height() > from_gap * 2
+            && to.width() > to_gap * 2
+            && to.height() > to_gap * 2
+        {
+            let uninset = Rect::new(
+                current.left - from_gap,
+                current.top - from_gap,
+                current.right + from_gap,
+                current.bottom + from_gap,
+            );
+            let touches_inset_edge = current.left == from.left + from_gap
+                || current.right == from.right - from_gap
+                || current.top == from.top + from_gap
+                || current.bottom == from.bottom - from_gap;
+            if touches_inset_edge
+                && uninset.left >= from.left
+                && uninset.right <= from.right
+                && uninset.top >= from.top
+                && uninset.bottom <= from.bottom
+            {
+                return Self::map_to_monitor(uninset, from, to).map(|mapped| mapped.inset(to_gap));
+            }
+        }
+        Self::map_to_monitor(current, from, to)
+    }
+
     fn boundaries(start: i32, end: i32, parts: usize) -> Vec<i32> {
         let span = i64::from(end - start);
         (0..=parts)
