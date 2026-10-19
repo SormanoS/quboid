@@ -197,6 +197,53 @@ fn shortcut_editor_adds_a_valid_binding() {
 }
 
 #[test]
+fn shortcuts_claimed_by_another_program_are_marked_in_the_editor_and_resolved_when_cleared() {
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let mut harness = ui_harness(&state, &intents);
+    harness.get_by_label("Scorciatoie").click();
+    harness.run();
+
+    assert!(harness.query_by_label("Già in uso").is_none());
+
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::HotkeysUnavailable {
+            actions: vec![Action::LeftHalf],
+        });
+    harness.run();
+
+    let _badge = harness.get_by_label("Già in uso");
+
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::HotkeysUnavailable {
+            actions: Vec::new(),
+        });
+    harness.run();
+
+    assert!(harness.query_by_label("Già in uso").is_none());
+}
+
+#[test]
+fn the_shortcut_list_marks_shortcuts_claimed_by_another_program() {
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let mut harness = ui_harness(&state, &intents);
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::HotkeysUnavailable {
+            actions: vec![Action::LeftHalf],
+        });
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::ShortcutsRequested);
+    harness.run();
+
+    let _badge = harness.get_by_label("Già in uso");
+}
+
+#[test]
 fn shortcut_editor_shows_readable_localized_key_names() {
     let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
