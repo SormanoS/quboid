@@ -1006,8 +1006,11 @@ impl UiState {
                     ui.end_row();
 
                     ui.label(text(language, "Soglia snap", "Snap threshold"));
-                    changed |=
-                        setting_slider(ui, &mut self.config.snap_threshold, 100..=1_500, " /10000");
+                    let mut snap_percent = ((self.config.snap_threshold + 50) / 100).clamp(1, 15);
+                    if setting_slider(ui, &mut snap_percent, 1..=15, "%") {
+                        self.config.snap_threshold = snap_percent * 100;
+                        changed = true;
+                    }
                     ui.end_row();
 
                     ui.label(text(language, "Cambio schermo", "Display change"));
