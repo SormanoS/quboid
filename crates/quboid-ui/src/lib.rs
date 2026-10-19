@@ -57,6 +57,7 @@ pub struct UiState {
     page: Page,
     status: String,
     shortcut_capture: Option<ShortcutCapture>,
+    shortcut_filter: String,
     win_keys_down: [bool; 2],
     /// Shortcuts Quboid asked Windows for and does not currently hold.
     unavailable_shortcuts: Vec<Action>,
@@ -73,6 +74,7 @@ impl UiState {
             page: Page::default(),
             status,
             shortcut_capture: None,
+            shortcut_filter: String::new(),
             win_keys_down: [false; 2],
             unavailable_shortcuts: Vec::new(),
             cheat_sheet: false,
@@ -635,36 +637,65 @@ impl UiState {
         let language = self.config.language;
         let mut changed = self.capture_shortcut(ui);
         let mut remove = None;
+        let defaults = AppConfig::default().hotkeys;
         let toolbar_height = ui.spacing().interact_size.y;
         ui.allocate_ui_with_layout(
             egui::vec2(ui.available_width(), toolbar_height),
-            egui::Layout::right_to_left(egui::Align::Center),
+            egui::Layout::left_to_right(egui::Align::Center),
             |ui| {
-                if ui
-                    .add_enabled(
-                        self.shortcut_capture.is_none(),
-                        egui::Button::new(text(language, "Aggiungi scorciatoia", "Add shortcut")),
-                    )
-                    .clicked()
-                {
-                    let action = Action::ALL
-                        .into_iter()
-                        .find(|action| {
-                            !self
-                                .config
-                                .hotkeys
-                                .iter()
-                                .any(|binding| binding.action == *action)
-                        })
-                        .unwrap_or(Action::LeftHalf);
-                    self.shortcut_capture = Some(ShortcutCapture::New(action));
-                }
-                if ui
-                    .button(text(language, "Tutte le scorciatoie", "Every shortcut"))
-                    .clicked()
-                {
-                    self.cheat_sheet = true;
-                }
+                ui.add_enabled(
+                    self.shortcut_capture.is_none(),
+                    egui::TextEdit::singleline(&mut self.shortcut_filter)
+                        .desired_width(180.0)
+                        .hint_text(text(language, "Filtra scorciatoie…", "Filter shortcuts…")),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add_enabled(
+                            self.shortcut_capture.is_none(),
+                            egui::Button::new(text(
+                                language,
+                                "Aggiungi scorciatoia",
+                                "Add shortcut",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        let action = Action::ALL
+                            .into_iter()
+                            .find(|action| {
+                                !self
+                                    .config
+                                    .hotkeys
+                                    .iter()
+                                    .any(|binding| binding.action == *action)
+                            })
+                            .unwrap_or(Action::LeftHalf);
+                        self.shortcut_capture = Some(ShortcutCapture::New(action));
+                    }
+                    if ui
+                        .add_enabled(
+                            self.shortcut_capture.is_none() && self.config.hotkeys != defaults,
+                            egui::Button::new(text(
+                                language,
+                                "Ripristina predefinite",
+                                "Restore defaults",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        self.config.hotkeys = defaults;
+                        self.shortcut_capture = None;
+                        self.win_keys_down = [false; 2];
+                        changed = true;
+                    }
+                    if ui
+                        .button(text(language, "Tutte le scorciatoie", "Every shortcut"))
+                        .clicked()
+                    {
+                        self.cheat_sheet = true;
+                    }
+                });
             },
         );
         ui.add_space(8.0);
@@ -704,6 +735,21 @@ impl UiState {
             ui.add_space(8.0);
         }
 
+        let needle = self.shortcut_filter.trim().to_lowercase();
+        let visible_indices = (0..self.config.hotkeys.len())
+            .filter(|&index| {
+                if needle.is_empty() {
+                    return true;
+                }
+                let binding = &self.config.hotkeys[index];
+                action_name(language, binding.action)
+                    .to_lowercase()
+                    .contains(&needle)
+                    || format_shortcut(binding, language)
+                        .to_lowercase()
+                        .contains(&needle)
+            })
+            .collect::<Vec<_>>();
         let scroll_height = (content_bottom - ui.available_rect_before_wrap().top()).max(0.0);
         egui::ScrollArea::vertical()
             .max_height(scroll_height)
@@ -717,7 +763,8 @@ impl UiState {
                     .num_columns(columns)
                     .spacing([SHORTCUT_CARD_SPACING, SHORTCUT_CARD_SPACING])
                     .show(ui, |ui| {
-                        for index in 0..self.config.hotkeys.len() {
+                        for (visible_position, index) in visible_indices.iter().copied().enumerate()
+                        {
                             ui.allocate_ui_with_layout(
                                 egui::vec2(card_width, 66.0),
                                 egui::Layout::top_down(egui::Align::Min),
@@ -792,11 +839,11 @@ impl UiState {
                                     });
                                 },
                             );
-                            if (index + 1) % columns == 0 {
+                            if (visible_position + 1) % columns == 0 {
                                 ui.end_row();
                             }
                         }
-                        if self.config.hotkeys.len() % columns != 0 {
+                        if !visible_indices.is_empty() && visible_indices.len() % columns != 0 {
                             ui.end_row();
                         }
                     });
