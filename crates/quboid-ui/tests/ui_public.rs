@@ -244,6 +244,46 @@ fn the_shortcut_list_marks_shortcuts_claimed_by_another_program() {
 }
 
 #[test]
+fn shortcut_editor_filters_cards_and_restores_the_default_shortcuts() {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::By;
+
+    let mut config = italian_config();
+    config
+        .hotkeys
+        .retain(|binding| binding.action == Action::LeftHalf);
+    let state = Rc::new(RefCell::new(UiState::new(config)));
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let mut harness = ui_harness(&state, &intents);
+    harness.get_by_label("Scorciatoie").click();
+    harness.run();
+
+    harness.get_by_label("Ripristina predefinite").click();
+    harness.run();
+
+    assert!(intents.borrow().iter().any(|intent| {
+        matches!(
+            intent,
+            UiIntent::Save(saved) if saved.hotkeys == AppConfig::default().hotkeys
+        )
+    }));
+
+    harness.get(By::new().role(Role::TextInput)).focus();
+    harness.run();
+    harness
+        .get(By::new().role(Role::TextInput))
+        .type_text("Annulla");
+    harness.run();
+
+    let _undo = harness.get_by_role_and_label(Role::Button, "Ctrl + Alt + Z");
+    assert!(
+        harness
+            .query_by_label("Ctrl + Alt + Freccia sinistra")
+            .is_none()
+    );
+}
+
+#[test]
 fn shortcut_editor_shows_readable_localized_key_names() {
     let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));
