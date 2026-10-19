@@ -9,6 +9,27 @@ of the GitHub release and the "What's new in this version" text of the
 Microsoft Store listing, which accepts plain text only: write short bullets,
 avoid tables and images, and keep each section under 1500 characters.
 
+## [1.0.0] - 2026-10-19
+
+### Added
+
+- Filter shortcuts by action name or key combination and restore the default
+  bindings in one click from the Shortcuts page.
+- Shortcuts that another program has already claimed are marked directly on the
+  Shortcuts page and in the `Ctrl+Alt+S` list.
+
+### Changed
+
+- The snap threshold is shown and adjusted as a percentage (`1%`–`15%`) in
+  General settings.
+
+### Fixed
+
+- Clicking an action card in Quboid's window places the last active external
+  window instead of failing because Quboid itself is in the foreground.
+- Moving a window to the next or previous monitor preserves the configured gap
+  at the destination monitor's scaling.
+
 ## [0.1.3] - 2026-09-24
 
 ### Added
