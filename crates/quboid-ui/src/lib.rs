@@ -58,6 +58,8 @@ pub struct UiState {
     status: String,
     shortcut_capture: Option<ShortcutCapture>,
     win_keys_down: [bool; 2],
+    /// Shortcuts Quboid asked Windows for and does not currently hold.
+    unavailable_shortcuts: Vec<Action>,
     /// Whether the read-only list of every shortcut is open over the page.
     cheat_sheet: bool,
     extension: Option<Box<dyn UiExtension>>,
@@ -72,6 +74,7 @@ impl UiState {
             status,
             shortcut_capture: None,
             win_keys_down: [false; 2],
+            unavailable_shortcuts: Vec::new(),
             cheat_sheet: false,
             extension: None,
         }
@@ -221,9 +224,10 @@ impl UiState {
 
     pub fn handle_event(&mut self, event: RuntimeEvent) {
         self.status = match event {
-            // A summary of conflicts already reported one by one; the host
-            // shows it outside this window.
-            RuntimeEvent::HotkeysUnavailable { .. } => return,
+            RuntimeEvent::HotkeysUnavailable { actions } => {
+                self.unavailable_shortcuts = actions;
+                return;
+            }
             RuntimeEvent::Ready => text(
                 self.config.language,
                 "Runtime Windows pronto",
@@ -470,6 +474,7 @@ impl UiState {
     fn show_cheat_sheet(&mut self, ui: &mut Ui) {
         let language = self.config.language;
         let hotkeys = self.config.hotkeys.clone();
+        let unavailable = self.unavailable_shortcuts.clone();
         let mut close = false;
         let modal = egui::Modal::new(egui::Id::new("cheat-sheet")).show(ui.ctx(), |ui| {
             let palette = Palette::of(ui);
@@ -523,7 +528,22 @@ impl UiState {
                                                 .color(palette.text_primary),
                                         );
                                         match shortcut_for(&hotkeys, action, language) {
-                                            Some(shortcut) => paint_key_cap(ui, &shortcut, palette),
+                                            Some(shortcut) => {
+                                                ui.horizontal(|ui| {
+                                                    paint_key_cap(ui, &shortcut, palette);
+                                                    if unavailable.contains(&action) {
+                                                        ui.label(
+                                                            RichText::new(text(
+                                                                language,
+                                                                "Già in uso",
+                                                                "In use",
+                                                            ))
+                                                            .size(11.5)
+                                                            .color(palette.warning),
+                                                        );
+                                                    }
+                                                });
+                                            }
                                             None => {
                                                 ui.label(
                                                     RichText::new(text(
@@ -726,6 +746,20 @@ impl UiState {
                                                 });
                                             let capture_active = self.shortcut_capture
                                                 == Some(ShortcutCapture::Existing(index));
+                                            let is_unavailable = self
+                                                .unavailable_shortcuts
+                                                .contains(&binding.action);
+                                            if is_unavailable {
+                                                ui.label(
+                                                    RichText::new(text(
+                                                        language,
+                                                        "Già in uso",
+                                                        "In use",
+                                                    ))
+                                                    .size(11.5)
+                                                    .color(Palette::of(ui).warning),
+                                                );
+                                            }
                                             let label = if capture_active {
                                                 text(
                                                     language,
