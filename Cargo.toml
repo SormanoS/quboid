@@ -17,7 +17,7 @@ rust-version = "1.85"
 [workspace.dependencies]
 crossbeam-channel = "0.5.15"
 eframe = { version = "0.36.1", default-features = false, features = ["glow"] }
-egui = "0.36.1"
+egui = "0.37.0"
 embed-resource = "3.0.11"
 egui_kittest = "0.36.1"
 rfd = "0.17.2"
