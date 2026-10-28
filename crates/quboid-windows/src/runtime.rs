@@ -142,10 +142,10 @@ impl Runtime {
 impl Drop for Runtime {
     fn drop(&mut self) {
         let _ = self.commands.send(RuntimeCommand::Stop);
-        if let Some(thread) = self.thread.take() {
-            if thread.join().is_err() {
-                error!("Win32 runtime thread panicked");
-            }
+        if let Some(thread) = self.thread.take()
+            && thread.join().is_err()
+        {
+            error!("Win32 runtime thread panicked");
         }
     }
 }
@@ -435,14 +435,14 @@ fn report_unavailable_hotkeys(
 
 fn suspend_hotkeys(hotkeys: &mut [RegisteredHotkey], events: &Sender<RuntimeEvent>) -> bool {
     for hotkey in hotkeys.iter_mut().filter(|hotkey| hotkey.registered) {
-        if let Some(id) = hotkey.id {
-            if let Err(error) = unsafe { UnregisterHotKey(None, id) } {
-                resume_hotkeys(hotkeys, events);
-                let _ = events.send(RuntimeEvent::Failed(format!(
-                    "global hotkeys could not be suspended: {error}"
-                )));
-                return false;
-            }
+        if let Some(id) = hotkey.id
+            && let Err(error) = unsafe { UnregisterHotKey(None, id) }
+        {
+            resume_hotkeys(hotkeys, events);
+            let _ = events.send(RuntimeEvent::Failed(format!(
+                "global hotkeys could not be suspended: {error}"
+            )));
+            return false;
         }
         hotkey.registered = false;
     }
