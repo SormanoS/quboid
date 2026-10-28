@@ -3,6 +3,25 @@
 Cosa è cambiato in ogni versione di Quboid, per chi lo usa. La versione inglese
 è [`CHANGELOG.md`](CHANGELOG.md); i due file vanno aggiornati insieme.
 
+## [1.0.1] - 2026-10-28
+
+### Aggiunto
+
+- Al primo avvio, Quboid apre ora la finestra delle impostazioni con l'elenco
+  delle scorciatoie, indicando che resta nell'area di notifica e si riapre in
+  qualunque momento con `Ctrl+Alt+S`.
+- Etichette di accessibilità per menu a tendina e cursori nelle impostazioni, e
+  supporto per i tasti multimediali, di navigazione e di blocco nella cattura
+  delle scorciatoie.
+
+### Corretto
+
+- La scorciatoia predefinita per `Ripristina` è ora `Ctrl+Alt+Backspace` (come
+  in Rectangle su macOS) invece di `Ctrl+Alt+Canc`, che Windows riserva alla
+  schermata di sicurezza di sistema e segnalava sempre come già in uso. Le
+  configurazioni esistenti con il vecchio valore predefinito vengono aggiornate
+  automaticamente.
+
 ## [1.0.0] - 2026-10-19
 
 ### Aggiunto
