@@ -143,6 +143,8 @@ jobs:
           $English = .\scripts\release-notes.ps1 -Version $env:VERSION -Language en
           $Italian = .\scripts\release-notes.ps1 -Version $env:VERSION -Language it
           $Notes = @"
+          **Install:** [Microsoft Store](https://apps.microsoft.com/detail/9NJMQV24WD26?cid=github-release) · ``winget install --id 9NJMQV24WD26 --source msstore`` · MSI installer · Portable ZIP
+
           $($English -join "`n")
 
           <details>

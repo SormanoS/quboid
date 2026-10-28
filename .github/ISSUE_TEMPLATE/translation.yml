@@ -1,0 +1,18 @@
+name: Translation
+description: Help translate Quboid into another language or improve an existing translation
+labels: ["translation", "help wanted"]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language and locale tag
+      placeholder: "German (de), French (fr), Spanish (es), Portuguese (pt-BR), Polish (pl)…"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Details
+      description: Let us know if you would like to translate the UI strings and Store release notes, or fix an existing string.
+    validations:
+      required: true

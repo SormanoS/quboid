@@ -1,0 +1,37 @@
+name: Display setup report
+description: Share a multi-monitor or docking setup that works (or breaks) for the Display Lab
+labels: ["display-setup"]
+body:
+  - type: markdown
+    attributes:
+      value: Confirmed setups are added to [`docs/tested-setups.md`](https://github.com/SormanoS/quboid/blob/main/docs/tested-setups.md) to help test multi-monitor, mixed-DPI and docking topologies.
+  - type: dropdown
+    id: windows
+    attributes:
+      label: Windows version
+      options: ["Windows 11", "Windows 10 22H2"]
+    validations:
+      required: true
+  - type: textarea
+    id: displays
+    attributes:
+      label: Monitors, resolution, scaling and relative positions
+      placeholder: "Primary: 14\" laptop 1920x1200 at 150%\nAbove primary: 27\" 3840x2160 at 200%\nLeft of primary: 24\" 1920x1080 at 100%"
+    validations:
+      required: true
+  - type: input
+    id: dock
+    attributes:
+      label: Dock or display connection
+      placeholder: "Thunderbolt 4 dock, USB-C alt mode, direct HDMI/DisplayPort…"
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Does Quboid place and restore windows accurately across this setup?
+      options: ["Yes — placement and dock/undock restore work", "Placement works, not using dock/undock", "Something is off (describe below)"]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (optional)

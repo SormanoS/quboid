@@ -165,8 +165,9 @@ pub fn run(profile: Profile) -> eframe::Result {
             "the configuration contained settings this build does not support; they were not loaded, and a copy was kept next to the document"
         );
     }
+    let first_run = imported.defaulted;
     let mut config = imported.config;
-    if imported.defaulted {
+    if first_run {
         // First run: nothing records a choice yet, so follow Windows and keep
         // the picked language by writing it out.
         config.language = system_language();
@@ -187,12 +188,15 @@ pub fn run(profile: Profile) -> eframe::Result {
     let tray =
         create_tray_icon(config.language, product).expect("Quboid could not create its tray icon");
 
+    // Windows 11 tucks new tray icons into the hidden-icons menu, so a silent
+    // first launch looks like nothing happened. Open the window once on first
+    // run with the shortcut sheet up, and stay in the tray on later launches.
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(product)
             .with_inner_size([1_040.0, 720.0])
             .with_min_inner_size([760.0, 560.0])
-            .with_visible(false),
+            .with_visible(first_run),
         ..Default::default()
     };
 
@@ -206,10 +210,13 @@ pub fn run(profile: Profile) -> eframe::Result {
             report_appearance_fallbacks(&appearance);
             apply_windows_style(&creation_context.egui_ctx, &appearance);
 
-            let ui = match ui_extension {
+            let mut ui = match ui_extension {
                 Some(extension) => UiState::with_extension(config, extension),
                 None => UiState::new(config),
             };
+            if first_run {
+                ui.open_welcome();
+            }
             Ok(Box::new(DesktopApp {
                 ui,
                 _runtime: runtime,

@@ -1,0 +1,213 @@
+# Building and packaging Quboid
+
+This document covers how Quboid is structured, how to build it from source, and how to package the Windows installer, portable archive, and Microsoft Store bundle. For publishing a release, see [`RELEASING.md`](RELEASING.md).
+
+## Development
+
+```powershell
+cargo run -p quboid-app
+cargo test --workspace
+```
+
+`cargo test` also runs guards that fail if networking crates enter `Cargo.lock` or if separately licensed types, pages, or runtime logic reappear in this tree.
+
+The complete suite also includes Windows-native and packaging tests:
+
+```powershell
+.\scripts\test-all.ps1 -WixPath C:\path\to\wix.exe
+```
+
+Use `-SkipPackaging` when only source and Windows behavior tests are needed.
+The Windows E2E test requires an interactive desktop and an executable allowed
+by the local application-control policy; pass a signed build with
+`-ExecutablePath` when unsigned binaries are blocked.
+
+Quboid runs with the current user's privileges. Windows intentionally prevents
+it from controlling elevated windows (User Interface Privilege Isolation, UIPI).
+
+## Architecture
+
+```text
+crates/quboid-core      actions, geometry and the configuration document
+crates/quboid-windows   the Win32 runtime: hooks, monitors, DPI, overlay
+crates/quboid-ui        the settings window: shell, theme and pages
+crates/quboid-app       the composition root, as a library and a binary
+```
+
+The Windows runtime is a deep module behind a command/event interface. Three
+small interfaces let a host change *what* it decides without reimplementing
+*how* it talks to Windows:
+
+- `SnapResolver`: which rectangle a drag snaps to (`EdgeSnapResolver` is the
+  standard adapter);
+- `ShortcutResolver`: which action a shortcut triggers
+  (`SingleActionShortcuts` is the standard adapter);
+- `WindowFilter`: which windows may be managed (`AllWindows` by default).
+
+The settings window exposes `UiExtension`, so a host can contribute pages while
+reusing the navigation rail, theme and shared controls. A hosted page reports
+whether its change is still in progress or ready to be written, so continuous
+edits stay visible to the runtime without rewriting the document on every frame.
+`quboid_app::run` accepts a `Profile` (storage, runtime adapters and optional
+extra pages), so a host can reuse the whole application shell.
+
+## Displays that come and go
+
+Every window Quboid places is remembered as the fraction of a named display's
+work area it covers. When the monitors change — a dock, an undock, a resolution
+or a scale change — Quboid waits for the topology to stop changing and puts
+those windows back on the display they were on, at the same fraction of its new
+work area. Windows the user minimized, maximized or closed in the meantime are
+left alone, and nothing the user placed by hand is touched. The setting is
+`restore_on_display_change`, on by default.
+
+Displays are matched by device name, so a monitor that Windows renumbers is
+treated as a different one and its windows simply stay where they are.
+
+## Configuration
+
+The `gap` is a size at 100%, so Quboid scales it to the effective DPI of the
+monitor a window lands on: the same setting looks the same on a 4K display at
+200% as on an unscaled one, and a window dragged between the two keeps the gap
+it appears to have.
+
+The document is stored at `%APPDATA%\Quboid\config.json`, or next to the
+executable when a `portable.flag` file is present. Documents written by earlier
+versions are migrated on load; settings that this build does not support are
+reported and left out instead of being rewritten.
+
+Before such settings disappear from the document, Quboid copies them once to
+`config.json.unsupported.json` next to it. That archive is written a single time
+and never rewritten, so a configuration written by another distribution survives
+the first save of this build. A document that keeps the Base settings in a
+`base` section, the shape another distribution writes, is imported by reading
+that section and reporting everything stored beside it as discarded.
+
+## Building and packaging
+
+### What you need
+
+| Tool | Needed for | How to get it |
+| --- | --- | --- |
+| Rust, stable MSVC toolchain | Everything. `rust-toolchain.toml` pins the channel and the `x86_64-pc-windows-msvc` target | [rustup](https://rustup.rs) |
+| Visual Studio Build Tools with the C++ workload | The MSVC linker that Rust invokes, and `dumpbin.exe` for verifying PE imports | Visual Studio Installer, "Desktop development with C++" |
+| Windows SDK | `mt.exe`, which packaging uses to verify the manifest embedded in the executable, and `rc.exe` if the manifest changes | Included in the workload above |
+| WiX Toolset v4 or later | The `.msi` | `dotnet tool install --global wix` |
+| The WiX Util extension, matching the WiX version | Stopping a running Quboid during an upgrade | `scripts\package.ps1` adds it to the global WiX cache itself, which needs network access the first time |
+| A code-signing certificate and `signtool.exe` | Signed releases. Optional: unsigned artifacts build fine, but Windows SmartScreen warns about them | Your certificate authority |
+
+WiX v7 refuses to build until its [Open Source Maintenance Fee](https://wixtoolset.org/osmf/)
+licence is accepted (`error WIX7015`). `scripts\package.ps1` accepts it for you
+when the WiX CLI it uses is v7 or later, so read that licence before packaging:
+it asks organizations above a revenue threshold to sponsor the toolset.
+
+### The executable
+
+```powershell
+cargo build --locked --release --target x86_64-pc-windows-msvc
+```
+
+The binary is written to `target\x86_64-pc-windows-msvc\release\quboid-app.exe`
+and needs no installation: it runs from wherever it is.
+
+`crates\quboid-app\build.rs` compiles `quboid.rc`, the resource script that embeds
+`quboid.exe.manifest`. That manifest is what asks Windows for per-monitor DPI
+awareness and for the privileges of the current user, so window geometry stays
+correct on mixed-DPI setups. The build locates `rc.exe` in the installed Windows
+SDK on its own, so editing the manifest needs no extra step: a plain
+`cargo build` picks the change up.
+
+### The installer and the portable archive
+
+```powershell
+.\scripts\package.ps1 -Version 1.0.0
+```
+
+The script builds the release executable, checks that the manifest embedded in
+it is the expected one, and writes three files to `dist`:
+
+- `Quboid-<version>-windows-x64.msi`: a per-user installer. It installs into
+  `%LOCALAPPDATA%\Quboid`, adds a Start Menu shortcut, upgrades an older version
+  in place and needs no administrator rights. Installing, upgrading or removing
+  it stops every running `quboid-app.exe`, a portable copy or a development
+  build included, because only one of them can own the global shortcuts; an
+  upgrade starts the new version again if Quboid was running before it;
+- `Quboid-<version>-windows-x64-portable.zip`: the executable, [`README.md`](../README.md) and
+  [`LICENSE`](../LICENSE), plus a `portable.flag` file. That flag is what makes Quboid keep
+  its configuration and logs next to the executable instead of under `%APPDATA%`,
+  so the archive can be unpacked onto a USB stick;
+- `SHA256SUMS.txt`: the checksums of both artifacts.
+
+WiX also leaves a `Quboid-<version>-windows-x64.wixpdb` next to them. It holds
+the debug symbols of the installer and is not part of a release.
+
+```powershell
+# Package what is already built, without compiling again.
+.\scripts\package.ps1 -Version 1.0.0 -SkipBuild
+
+# Use a WiX CLI that is not on PATH, or another one than the PATH provides.
+.\scripts\package.ps1 -Version 1.0.0 -WixPath $env:USERPROFILE\.dotnet\tools\wix.exe
+
+# Sign the executable and the installer with a certificate in your store.
+.\scripts\package.ps1 -Version 1.0.0 -CertificateThumbprint <thumbprint>
+```
+
+### The Store package
+
+```powershell
+.\scripts\package-msix.ps1
+```
+
+This writes `dist\Quboid-<version>-windows-x64.msix`, a full-trust packaged
+build for the Microsoft Store. The package is deliberately left unsigned: the
+Store re-signs submitted MSIX packages itself, and the `Publisher` in
+`packaging\msix\AppxManifest.xml` is the identifier Partner Center assigned to
+the reserved name rather than a certificate anyone holds.
+
+```powershell
+# Register the staged layout instead of packing it. The app then runs with
+# real package identity, which is the only way to exercise the packaged
+# behaviour, and it needs Developer Mode but no certificate and no admin.
+.\scripts\package-msix.ps1 -Register
+```
+
+Launch-at-login differs between the two builds. A packaged build has no say
+over the Run key, so it drives the `StartupTask` the manifest declares; every
+other build writes `HKCU\...\CurrentVersion\Run` as before. Both paths live
+behind `set_launch_at_login`.
+
+### Icons
+
+```powershell
+.\scripts\generate-icons.ps1
+```
+
+Every icon is drawn from one description, so the executable, the tray and the
+Store package cannot drift apart. The script writes `quboid.ico`, which
+`quboid.rc` embeds into the executable, and the scale- and target-size
+variants under `packaging\msix\assets`. Those variants are named for Windows
+to resolve, which it only does through the resource index `package-msix.ps1`
+builds with `makepri`; the index is what lets the manifest name
+`Square44x44Logo.png` even though no file has that exact name.
+
+Pass `-PreviewPath <file.png>` to render the mark at the sizes that decide
+whether it still reads, on both a light and a dark surface, without touching
+the assets.
+
+### Checking the artifacts
+
+```powershell
+.\scripts\test-packaging.ps1 -Version 1.0.0 -InstallSmoke
+```
+
+This verifies the checksums, the contents of the portable archive and the
+properties of the installer, reads back the manifest embedded in the shipped
+executable, and checks with `dumpbin.exe /imports` that the executable links no
+networking DLLs. With `-InstallSmoke` it also installs the MSI silently, checks
+that the executable landed in `%LOCALAPPDATA%\Quboid` and uninstalls it again;
+it refuses to run that step when Quboid is already installed, so it never
+replaces your own installation. It does stop a Quboid you are running from a
+portable copy or from `cargo run`, as any install of the MSI does.
+
+`.\scripts\test-all.ps1` runs the whole chain: formatting, tests, lints, the
+release build, the Windows end-to-end test, packaging and these checks.

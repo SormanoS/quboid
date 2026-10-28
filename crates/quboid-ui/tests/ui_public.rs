@@ -36,6 +36,46 @@ fn undo_is_reachable_as_a_named_action_card() {
 }
 
 #[test]
+fn first_run_welcome_opens_the_shortcut_list_with_the_tray_hint_and_clears_when_closed() {
+    let state = Rc::new(RefCell::new(UiState::new(italian_config())));
+    state.borrow_mut().open_welcome();
+    let intents = Rc::new(RefCell::new(Vec::new()));
+    let mut harness = ui_harness(&state, &intents);
+
+    let _welcome = harness.get_by_label(
+        "Quboid resta nell'area di notifica. Premi Ctrl+Alt+S in qualunque momento per vedere le scorciatoie.",
+    );
+    let _bound = harness.get_by_label("Ctrl + Alt + Freccia sinistra");
+
+    harness.key_press(Key::Escape);
+    harness.run();
+    harness.run();
+
+    assert!(
+        harness
+            .query_by_label(
+                "Quboid resta nell'area di notifica. Premi Ctrl+Alt+S in qualunque momento per vedere le scorciatoie.",
+            )
+            .is_none()
+    );
+
+    // Opening the cheat-sheet later shows the shortcuts without repeating the first-run banner.
+    state
+        .borrow_mut()
+        .handle_event(RuntimeEvent::ShortcutsRequested);
+    harness.run();
+
+    let _hint = harness.get_by_label("Premi Esc per chiudere.");
+    assert!(
+        harness
+            .query_by_label(
+                "Quboid resta nell'area di notifica. Premi Ctrl+Alt+S in qualunque momento per vedere le scorciatoie.",
+            )
+            .is_none()
+    );
+}
+
+#[test]
 fn asking_for_the_shortcuts_lists_the_actions_and_the_keys_that_run_them() {
     let state = Rc::new(RefCell::new(UiState::new(italian_config())));
     let intents = Rc::new(RefCell::new(Vec::new()));

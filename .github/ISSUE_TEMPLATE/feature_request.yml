@@ -1,0 +1,27 @@
+name: Feature request
+description: Describe a workflow problem or suggest an improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the workflow or situation before proposing a solution.
+      placeholder: "When I switch between my laptop screen and my ultrawide monitor…"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How would you like Quboid to handle it?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Have you seen this in another tool (Rectangle, FancyZones, etc.)?
+  - type: dropdown
+    id: source
+    attributes:
+      label: How did you find Quboid? (optional)
+      options: ["Microsoft Store search", "GitHub", "Hacker News", "Reddit", "An article", "A friend or colleague", "Other"]
