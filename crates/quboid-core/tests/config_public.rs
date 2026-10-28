@@ -40,6 +40,7 @@ fn default_shortcuts_match_rectangle_windows_mapping() {
     assert_eq!(binding(Action::CenterTwoThirds), Some((0x0003, 0x52)));
     assert_eq!(binding(Action::Maximize), Some((0x0003, 0x0D)));
     assert_eq!(binding(Action::MaximizeHeight), Some((0x0007, 0x26)));
+    assert_eq!(binding(Action::Restore), Some((0x0003, 0x08)));
     assert_eq!(binding(Action::NextMonitor), Some((0x000B, 0x27)));
     assert_eq!(binding(Action::Undo), Some((0x0003, 0x5A)));
     assert_eq!(binding(Action::ShowShortcuts), Some((0x0003, 0x53)));
@@ -503,4 +504,31 @@ fn version_four_document_gains_the_display_change_setting() {
     assert!(imported.config.restore_on_display_change);
     assert_eq!(imported.config.gap, 12);
     assert!(imported.discarded_sections.is_empty());
+}
+
+#[test]
+fn version_six_document_moves_restore_off_windows_reserved_ctrl_alt_delete() {
+    let storage = PortableConfigAdapter::new("unused");
+    let version_six = br#"{
+        "schema_version": 6,
+        "language": "italian",
+        "launch_at_login": false,
+        "drag_snap_enabled": true,
+        "restore_on_display_change": true,
+        "hotkeys": [
+            { "action": "restore", "modifiers": 3, "virtual_key": 46 }
+        ]
+    }"#;
+
+    let config = storage.import(version_six).unwrap().config;
+
+    assert_eq!(
+        config
+            .hotkeys
+            .iter()
+            .find(|binding| binding.action == Action::Restore)
+            .map(|binding| (binding.modifiers, binding.virtual_key)),
+        Some((0x0003, 0x08))
+    );
+    assert!(config.validate().is_ok());
 }

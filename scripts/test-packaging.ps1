@@ -97,6 +97,30 @@ try {
         throw "The executable manifest does not use asInvoker."
     }
 
+    $VsRoots = @(
+        "${env:ProgramFiles}\Microsoft Visual Studio",
+        "${env:ProgramFiles(x86)}\Microsoft Visual Studio"
+    ) | Where-Object { Test-Path -LiteralPath $_ }
+    $Dumpbin = Get-ChildItem -LiteralPath $VsRoots `
+        -Recurse `
+        -File `
+        -Filter "dumpbin.exe" `
+        -ErrorAction SilentlyContinue |
+        Where-Object { $_.DirectoryName -like "*\Hostx64\x64" } |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+    if (-not $Dumpbin) {
+        throw "Visual Studio dumpbin.exe was not found."
+    }
+    $Imports = & $Dumpbin.FullName /nologo /imports $PortableExecutable
+    if ($LASTEXITCODE -ne 0) {
+        throw "The executable import table could not be read with dumpbin.exe."
+    }
+    $NetworkDll = $Imports | Select-String -Pattern '\b(ws2_32|winhttp|wininet|mswsock|dnsapi|iphlpapi|urlmon)\.dll\b'
+    if ($NetworkDll) {
+        throw "The executable imports a networking library: $($NetworkDll.Line -join ', ')"
+    }
+
     if ($InstallSmoke) {
         if (Test-Path -LiteralPath $InstalledExecutable) {
             throw "Quboid is already installed; refusing to replace an existing installation."

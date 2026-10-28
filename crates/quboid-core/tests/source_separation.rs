@@ -23,9 +23,11 @@ const SCANNED_EXTENSIONS: [&str; 10] = [
 
 /// Files the guard must reach: narrowing its reach has to fail the test instead
 /// of quietly stopping the check.
-const REQUIRED_COVERAGE: [&str; 7] = [
+const REQUIRED_COVERAGE: [&str; 9] = [
     "Cargo.toml",
     "README.md",
+    "docs/BUILDING.md",
+    "docs/RELEASING.md",
     "crates/quboid-app/quboid.rc",
     "crates/quboid-core/src/config.rs",
     "packaging/wix/Quboid.wxs",
@@ -56,6 +58,45 @@ fn legacy_section_names() -> [&'static str; 2] {
         concat!("action", "_cycles"),
         concat!("application", "_rules"),
     ]
+}
+
+const FORBIDDEN_NETWORK_CRATES: [&str; 17] = [
+    "curl",
+    "h2",
+    "hyper",
+    "isahc",
+    "mio",
+    "native-tls",
+    "openssl",
+    "reqwest",
+    "rustls",
+    "socket2",
+    "surf",
+    "tokio",
+    "tungstenite",
+    "ureq",
+    "webpki",
+    "winhttp",
+    "ws2_32-sys",
+];
+
+#[test]
+fn the_dependency_tree_contains_no_networking_crates() {
+    let root = workspace_root();
+    let lockfile = fs::read_to_string(root.join("Cargo.lock")).expect("Cargo.lock");
+    for crate_name in FORBIDDEN_NETWORK_CRATES {
+        let pattern = format!("name = \"{crate_name}\"");
+        assert!(
+            !lockfile.contains(&pattern),
+            "Cargo.lock contains networking crate {crate_name}"
+        );
+    }
+
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).expect("Cargo.toml");
+    assert!(
+        !manifest.contains("Win32_Networking"),
+        "Cargo.toml enables Win32_Networking features"
+    );
 }
 
 #[test]

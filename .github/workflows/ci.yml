@@ -87,6 +87,28 @@ jobs:
       - name: Build the release executable
         run: cargo build --locked --release --target x86_64-pc-windows-msvc
 
+      - name: Verify the release executable imports no networking DLLs
+        run: |
+          $VsRoots = @(
+              "${env:ProgramFiles}\Microsoft Visual Studio",
+              "${env:ProgramFiles(x86)}\Microsoft Visual Studio"
+          ) | Where-Object { Test-Path -LiteralPath $_ }
+          $Dumpbin = Get-ChildItem -LiteralPath $VsRoots -Recurse -File -Filter "dumpbin.exe" -ErrorAction SilentlyContinue |
+              Where-Object { $_.DirectoryName -like "*\Hostx64\x64" } |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
+          if (-not $Dumpbin) {
+              throw "Visual Studio dumpbin.exe was not found."
+          }
+          $Imports = & $Dumpbin.FullName /nologo /imports "target\x86_64-pc-windows-msvc\release\quboid-app.exe"
+          if ($LASTEXITCODE -ne 0) {
+              throw "dumpbin /imports failed."
+          }
+          $Forbidden = $Imports | Select-String -Pattern '\b(ws2_32|winhttp|wininet|mswsock|dnsapi|iphlpapi|urlmon)\.dll\b'
+          if ($Forbidden) {
+              throw "Networking DLL import found: $($Forbidden.Line -join ', ')"
+          }
+
       - name: Package
         run: .\scripts\package.ps1 -Version ${{ steps.version.outputs.version }} -SkipBuild
 
