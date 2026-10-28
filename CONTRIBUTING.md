@@ -1,8 +1,11 @@
 # Contributing to Quboid
 
+> **In short:** Code contributions are licensed to the author under terms that also allow commercial licensing; your work stays GPL v3 in every published version. Opening issues, reporting bugs, sharing monitor setups and participating in discussions require no agreement at all.
+
 Thank you for considering a contribution. This document explains the licensing
 terms that contributions are accepted under. Please read it before opening a
-pull request.
+pull request. For build instructions and architecture details, see
+[`docs/BUILDING.md`](docs/BUILDING.md).
 
 ## Licensing of contributions
 

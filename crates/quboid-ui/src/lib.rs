@@ -63,6 +63,8 @@ pub struct UiState {
     unavailable_shortcuts: Vec<Action>,
     /// Whether the read-only list of every shortcut is open over the page.
     cheat_sheet: bool,
+    /// Whether the shortcut list was opened automatically to welcome a first run.
+    welcome: bool,
     extension: Option<Box<dyn UiExtension>>,
 }
 
@@ -78,6 +80,7 @@ impl UiState {
             win_keys_down: [false; 2],
             unavailable_shortcuts: Vec::new(),
             cheat_sheet: false,
+            welcome: false,
             extension: None,
         }
     }
@@ -88,6 +91,13 @@ impl UiState {
             extension: Some(extension),
             ..Self::new(config)
         }
+    }
+
+    /// Opens the shortcut cheat-sheet with the first-run welcome note so a new
+    /// user sees that Quboid is running and how to bring the shortcuts back up.
+    pub fn open_welcome(&mut self) {
+        self.welcome = true;
+        self.cheat_sheet = true;
     }
 
     pub fn config(&self) -> &AppConfig {
@@ -477,6 +487,7 @@ impl UiState {
         let language = self.config.language;
         let hotkeys = self.config.hotkeys.clone();
         let unavailable = self.unavailable_shortcuts.clone();
+        let welcome = self.welcome;
         let mut close = false;
         let modal = egui::Modal::new(egui::Id::new("cheat-sheet")).show(ui.ctx(), |ui| {
             let palette = Palette::of(ui);
@@ -487,6 +498,18 @@ impl UiState {
                     .size(18.0)
                     .color(palette.text_primary),
             );
+            if welcome {
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(text(
+                        language,
+                        "Quboid resta nell'area di notifica. Premi Ctrl+Alt+S in qualunque momento per vedere le scorciatoie.",
+                        "Quboid stays in the notification area. Press Ctrl+Alt+S at any time to see the shortcuts.",
+                    ))
+                    .size(13.0)
+                    .color(palette.brand_text),
+                );
+            }
             ui.add_space(2.0);
             ui.label(
                 RichText::new(text(
@@ -576,6 +599,7 @@ impl UiState {
 
         if close || modal.should_close() {
             self.cheat_sheet = false;
+            self.welcome = false;
         }
     }
 

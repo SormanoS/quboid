@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use crate::{Action, NORMALIZED_SCALE};
 
-pub const CURRENT_SCHEMA_VERSION: u32 = 6;
+pub const CURRENT_SCHEMA_VERSION: u32 = 7;
 pub const MAX_CONFIG_BYTES: usize = 1024 * 1024;
 pub const CONFIG_FILE_NAME: &str = "config.json";
 pub const INSTALLED_DIRECTORY_NAME: &str = "Quboid";
@@ -135,7 +135,7 @@ fn rectangle_default_hotkeys() -> Vec<HotkeyBinding> {
         (Action::Grow, CONTROL_ALT, 0xBB),
         (Action::Shrink, CONTROL_ALT, 0xBD),
         (Action::Center, CONTROL_ALT, 0x43),
-        (Action::Restore, CONTROL_ALT, 0x2E),
+        (Action::Restore, CONTROL_ALT, 0x08),
         (Action::Undo, CONTROL_ALT, 0x5A),
         (Action::PreviousMonitor, CONTROL_ALT | WIN, 0x25),
         (Action::NextMonitor, CONTROL_ALT | WIN, 0x27),
@@ -564,6 +564,7 @@ fn migrate(mut value: Value, mut version: u32) -> Result<(Value, Vec<String>), C
             3 => migrate_v3_to_v4(value, &mut discarded)?,
             4 => migrate_v4_to_v5(value)?,
             5 => migrate_v5_to_v6(value)?,
+            6 => migrate_v6_to_v7(value)?,
             unsupported => return Err(ConfigError::UnsupportedVersion(unsupported).into()),
         };
         version += 1;
@@ -652,6 +653,37 @@ fn migrate_v5_to_v6(value: Value) -> Result<Value, ConfigStorageError> {
 
     insert_serialized(&mut object, "hotkeys", &bindings)?;
     object.insert("schema_version".to_owned(), Value::from(6_u32));
+    Ok(Value::Object(object))
+}
+
+/// Version 7 replaces the old default `Ctrl+Alt+Delete` (`0x2E`) binding for
+/// `Restore` with `Ctrl+Alt+Backspace` (`0x08`), matching Rectangle on macOS
+/// (`⌃⌥⌫`). Windows reserves `Ctrl+Alt+Delete` for the system secure
+/// attention sequence, so `RegisterHotKey` always rejected `0x2E`.
+fn migrate_v6_to_v7(value: Value) -> Result<Value, ConfigStorageError> {
+    const CONTROL_ALT: u32 = 0x0002 | 0x0001;
+    const VK_BACK: u32 = 0x08;
+    const VK_DELETE: u32 = 0x2E;
+
+    let mut object = expect_object(value)?;
+    if let Some(hotkeys) = object.get("hotkeys") {
+        let mut bindings: Vec<HotkeyBinding> = serde_json::from_value(hotkeys.clone())?;
+        let backspace_taken = bindings
+            .iter()
+            .any(|binding| (binding.modifiers, binding.virtual_key) == (CONTROL_ALT, VK_BACK));
+        if !backspace_taken {
+            for binding in &mut bindings {
+                if binding.action == Action::Restore
+                    && binding.modifiers == CONTROL_ALT
+                    && binding.virtual_key == VK_DELETE
+                {
+                    binding.virtual_key = VK_BACK;
+                }
+            }
+        }
+        insert_serialized(&mut object, "hotkeys", &bindings)?;
+    }
+    object.insert("schema_version".to_owned(), Value::from(7_u32));
     Ok(Value::Object(object))
 }
 

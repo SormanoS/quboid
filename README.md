@@ -1,324 +1,128 @@
 # Quboid
 
-Quboid is a native Windows window manager written in Rust. It provides global
-shortcuts, multi-monitor placement, edge and corner drag snapping and a native
-settings window.
+**Snap windows to halves, thirds and quarters with Rectangle's keyboard shortcuts — on Windows 10 and 11, across mixed-DPI monitors, with no network code.**
 
-The project currently targets Windows 10 22H2 and Windows 11 on x86_64.
+[![Get it from the Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-Get%20it-0078D6?logo=microsoft)](https://apps.microsoft.com/detail/9NJMQV24WD26?cid=readme)
+[![Latest release](https://img.shields.io/github/v/release/SormanoS/quboid)](https://github.com/SormanoS/quboid/releases/latest)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+[![No network code](https://img.shields.io/badge/network%20code-none-success)](#privacy)
 
-Quboid starts in the notification area instead of opening its settings window.
-Windows controls whether its icon is shown directly on the taskbar or under the
-hidden-icons menu.
-
-## Development
+## Quick start
 
 ```powershell
-cargo run -p quboid-app
-cargo test --workspace
+winget install --id 9NJMQV24WD26 --source msstore
 ```
 
-`cargo test` also runs a guard that fails if separately licensed types, pages or
-runtime logic reappear in this tree.
+Or get it from the [Microsoft Store](https://apps.microsoft.com/detail/9NJMQV24WD26?cid=readme), or download the [MSI installer or portable ZIP](https://github.com/SormanoS/quboid/releases/latest) (~3.6 MB download, no administrator rights needed).
 
-The complete suite also includes Windows-native and packaging tests:
+On first launch Quboid opens its shortcut sheet so you can see every command right away. After that it stays in the Windows notification area (system tray) — press **Ctrl+Alt+←** to snap the active window left, and **Ctrl+Alt+S** at any time to bring up the shortcut list.
 
-```powershell
-.\scripts\test-all.ps1 -WixPath C:\path\to\wix.exe
-```
+## Why Quboid?
 
-Use `-SkipPackaging` when only source and Windows behavior tests are needed.
-The Windows E2E test requires an interactive desktop and an executable allowed
-by the local application-control policy; pass a signed build with
-`-ExecutablePath` when unsigned binaries are blocked.
+- **Rectangle's shortcuts, on Windows.** The same default layout as [Rectangle](https://rectangleapp.com/) on macOS: halves, quarters, thirds, two-thirds, center, maximize height, restore and multi-step undo. Every shortcut can be remapped, and Quboid tells you on its tray icon and in the editor when another app has already taken one.
+- **Made for several monitors and for docking.** Move windows between monitors with different scaling, even ones placed left of or above the main display (negative coordinates). A configurable gap is scaled to each monitor's effective DPI so it looks identical on a 4K panel at 200% and a 1080p panel at 100%. After you dock or undock, Quboid waits for the display topology to settle and puts the windows it placed back on the same fraction of their display.
+- **Private by construction.** No telemetry, no accounts, no crash uploads, no update checks. The executable imports no networking library and `Cargo.lock` contains no networking crates — both are enforced in CI and [verifiable in one command](#privacy).
+- **Small and quiet.** A single native Rust executable (~8.4 MB unpacked, ~3.6 MB installer, 0% CPU at idle) with an English and Italian UI, edge and corner drag snapping, launch at login, and a portable ZIP mode that keeps `config.json` and logs next to the executable on a USB stick.
 
-Quboid runs with the current user's privileges. Windows intentionally prevents
-it from controlling elevated windows.
+## Default shortcuts
 
-## Features
+| Move the active window to… | Shortcut |
+| --- | --- |
+| Left, right, top or bottom half | `Ctrl+Alt+←` `→` `↑` `↓` |
+| Top-left, top-right, bottom-left or bottom-right quarter | `Ctrl+Alt+U` `I` `J` `K` |
+| First, center or last third | `Ctrl+Alt+D` `F` `G` |
+| First, center or last two thirds | `Ctrl+Alt+E` `R` `T` |
+| Maximize / Maximize height | `Ctrl+Alt+Enter` / `Ctrl+Alt+Shift+↑` |
+| Center / Restore original size | `Ctrl+Alt+C` / `Ctrl+Alt+Backspace` |
+| Grow / Shrink | `Ctrl+Alt++` / `Ctrl+Alt+-` |
+| Previous or next monitor | `Ctrl+Alt+Win+←` `→` |
+| Undo the last placement | `Ctrl+Alt+Z` |
+| See every shortcut (cheat-sheet) | `Ctrl+Alt+S` |
 
-- Halves, thirds, quarters, centering, resizing and incremental movement
-- Undo, which takes back the last placement one step at a time
-- Movement between monitors with negative-coordinate and mixed-DPI support
-- Windows put back where they were when the monitors change, as after a dock or
-  an undock
-- Configurable global shortcuts, one action per shortcut
-- A read-only list of every shortcut, on `Ctrl+Alt+S`, which opens even when
-  Quboid is in the notification area
-- Edge and corner drag snapping with a non-interactive overlay
-- A gap that keeps its size on every monitor, whatever each one is scaled to
-- One Quboid per Windows session: starting it again brings up the settings
-  window of the one already running instead of a second copy that would own
-  none of the shortcuts
-- A notification area icon that says how many shortcuts another program has
-  already taken
-- Italian and English interface, picked from the Windows user locale on first run, tray mode and launch at login
-- Versioned JSON configuration with import/export and portable mode
+Additional actions (`Center half`, `Almost maximize`, and directional step moves) are available in the **Actions** and **Shortcuts** tabs and can be bound to any key combination.
 
-## Architecture
+## How it compares
 
-```text
-crates/quboid-core      actions, geometry and the configuration document
-crates/quboid-windows   the Win32 runtime: hooks, monitors, DPI, overlay
-crates/quboid-ui        the settings window: shell, theme and pages
-crates/quboid-app       the composition root, as a library and a binary
-```
+| Tool | Approach | When to pick it instead | How Quboid differs |
+| --- | --- | --- | --- |
+| **Windows 11 Snap** | Built-in (`Win+Arrows`, `Win+Z` Snap Layouts) | You only need basic halves or the mouse popup menu on Windows 11 | Direct single-stroke shortcuts for thirds, two-thirds and quarters; multi-step undo; DPI-scaled gap; works on Windows 10 22H2 too |
+| **FancyZones (PowerToys)** | Custom zones inside a 20+ utility suite | You want hand-drawn zone templates and already use PowerToys | Standalone executable; instant keyboard shortcuts for every layout without holding `Shift` while dragging; Rectangle defaults |
+| **komorebi / GlazeWM** | Automatic tiling window managers with config files | You want every window tiled automatically like i3 or bspwm | Not a tiling WM: moves only the window you ask it to move and leaves the rest alone; native GUI settings, zero config files |
+| **AltSnap** | `Alt` + mouse drag anywhere inside a window | You prefer positioning windows with the mouse | Built around keyboard shortcuts and automatic restore after dock/undock |
+| **AquaSnap / DisplayFusion** | Proprietary desktop suites | You need multi-monitor taskbars, wallpaper tools or window tabbing | Free and open source (GPLv3), verifiable offline binary |
 
-The Windows runtime is a deep module behind a command/event interface. Three
-small interfaces let a host change *what* it decides without reimplementing
-*how* it talks to Windows:
+### When Quboid is not for you
 
-- `SnapResolver`: which rectangle a drag snaps to (`EdgeSnapResolver` is the
-  standard adapter);
-- `ShortcutResolver`: which action a shortcut triggers
-  (`SingleActionShortcuts` is the standard adapter);
-- `WindowFilter`: which windows may be managed (`AllWindows` by default).
+Quboid moves the window you ask it to move and leaves every other window alone. If you want a tiling window manager that arranges every window automatically, look at [komorebi](https://github.com/LGUG2Z/komorebi) or [GlazeWM](https://github.com/glzr-io/glazewm). If you want custom zones you draw yourself, [FancyZones](https://learn.microsoft.com/windows/powertoys/fancyzones) in PowerToys does that well.
 
-The settings window exposes `UiExtension`, so a host can contribute pages while
-reusing the navigation rail, theme and shared controls. A hosted page reports
-whether its change is still in progress or ready to be written, so continuous
-edits stay visible to the runtime without rewriting the document on every frame.
-`quboid_app::run` accepts a `Profile` (storage, runtime adapters and optional
-extra pages), so a host can reuse the whole application shell.
+## FAQ
 
-## Displays that come and go
+<details>
+<summary><strong>Can Quboid move windows that run as administrator?</strong></summary>
 
-Every window Quboid places is remembered as the fraction of a named display's
-work area it covers. When the monitors change — a dock, an undock, a resolution
-or a scale change — Quboid waits for the topology to stop changing and puts
-those windows back on the display they were on, at the same fraction of its new
-work area. Windows the user minimized, maximized or closed in the meantime are
-left alone, and nothing the user placed by hand is touched. The setting is
-`restore_on_display_change`, on by default.
+No. Quboid runs with your normal user account (`asInvoker`) and never asks for administrator privileges. Windows blocks non-elevated programs from moving or resizing elevated windows (User Interface Privilege Isolation, UIPI). When you press a shortcut on an administrator window, Quboid reports that Windows prevented the action in its status bar.
+</details>
 
-Displays are matched by device name, so a monitor that Windows renumbers is
-treated as a different one and its windows simply stay where they are.
+<details>
+<summary><strong>Windows 11 already has Snap Layouts. Why use Quboid?</strong></summary>
 
-## Configuration
+Windows 11's `Win+Z` menu requires picking a layout and then picking a slot in it. Quboid gives every layout — including thirds, two-thirds, quarters, center, grow/shrink and multi-step undo (`Ctrl+Alt+Z`) — a direct keyboard shortcut that matches Rectangle on macOS, scales the gap to each monitor's DPI, and works the same way on Windows 10 22H2 and Windows 11.
+</details>
 
-The `gap` is a size at 100%, so Quboid scales it to the effective DPI of the
-monitor a window lands on: the same setting looks the same on a 4K display at
-200% as on an unscaled one, and a window dragged between the two keeps the gap
-it appears to have.
+<details>
+<summary><strong>Do my windows go back where they were after I dock or undock my laptop?</strong></summary>
 
-The document is stored at `%APPDATA%\Quboid\config.json`, or next to the
-executable when a `portable.flag` file is present. Documents written by earlier
-versions are migrated on load; settings that this build does not support are
-reported and left out instead of being rewritten.
+Yes. Every window Quboid places is remembered as the fraction of a named display's work area it covers. When monitors connect, disconnect or change resolution, Quboid waits 2 seconds for the display topology to stop changing and puts those windows back on the same display at the same fraction of its work area. Windows you minimized, maximized, closed or moved by hand are left untouched.
+</details>
 
-Before such settings disappear from the document, Quboid copies them once to
-`config.json.unsupported.json` next to it. That archive is written a single time
-and never rewritten, so a configuration written by another distribution survives
-the first save of this build. A document that keeps the Base settings in a
-`base` section, the shape another distribution writes, is imported by reading
-that section and reporting everything stored beside it as discarded.
+<details>
+<summary><strong>Where is Quboid after I close the window?</strong></summary>
 
-## Building and packaging
+Closing the settings window hides Quboid to the Windows notification area (system tray) so global shortcuts keep working. On Windows 11, new tray icons appear inside the hidden-icons menu (`^` next to the clock) until you drag them onto the taskbar. You can open Quboid at any time by pressing **`Ctrl+Alt+S`**, clicking its tray icon, or launching Quboid again from the Start menu (starting a second instance brings up the one already running).
+</details>
 
-### What you need
+<details>
+<summary><strong>Why does <code>AltGr</code> trigger a shortcut on some European keyboard layouts?</strong></summary>
 
-| Tool | Needed for | How to get it |
-| --- | --- | --- |
-| Rust, stable MSVC toolchain | Everything. `rust-toolchain.toml` pins the channel and the `x86_64-pc-windows-msvc` target | [rustup](https://rustup.rs) |
-| Visual Studio Build Tools with the C++ workload | The MSVC linker that Rust invokes | Visual Studio Installer, "Desktop development with C++" |
-| Windows SDK | `mt.exe`, which packaging uses to verify the manifest embedded in the executable, and `rc.exe` if the manifest changes | Included in the workload above |
-| WiX Toolset v4 or later | The `.msi` | `dotnet tool install --global wix` |
-| The WiX Util extension, matching the WiX version | Stopping a running Quboid during an upgrade | `scripts\package.ps1` adds it to the global WiX cache itself, which needs network access the first time |
-| A code-signing certificate and `signtool.exe` | Signed releases. Optional: unsigned artifacts build fine, but Windows SmartScreen warns about them | Your certificate authority |
+On Windows, pressing `AltGr` sends `Ctrl+Alt`. On layouts where `AltGr` types third-level characters — such as `AltGr+E` for `€` on Italian and German keyboards, or `AltGr+C/E/S/Z` on Polish keyboards — Windows treats that key press as `Ctrl+Alt+<key>`. Open Quboid's **Shortcuts** tab to remap or remove any `Ctrl+Alt` binding that collides with a character you type with `AltGr`.
+</details>
 
-WiX v7 refuses to build until its [Open Source Maintenance Fee](https://wixtoolset.org/osmf/)
-licence is accepted (`error WIX7015`). `scripts\package.ps1` accepts it for you
-when the WiX CLI it uses is v7 or later, so read that licence before packaging:
-it asks organizations above a revenue threshold to sponsor the toolset.
+<details>
+<summary><strong>Windows SmartScreen warns me about the MSI or portable ZIP. Is it safe?</strong></summary>
 
-### The executable
-
-```powershell
-cargo build --locked --release --target x86_64-pc-windows-msvc
-```
-
-The binary is written to `target\x86_64-pc-windows-msvc\release\quboid-app.exe`
-and needs no installation: it runs from wherever it is.
-
-`crates\quboid-app\build.rs` compiles `quboid.rc`, the resource script that embeds
-`quboid.exe.manifest`. That manifest is what asks Windows for per-monitor DPI
-awareness and for the privileges of the current user, so window geometry stays
-correct on mixed-DPI setups. The build locates `rc.exe` in the installed Windows
-SDK on its own, so editing the manifest needs no extra step: a plain
-`cargo build` picks the change up.
-
-### The installer and the portable archive
-
-```powershell
-.\scripts\package.ps1 -Version 0.1.0
-```
-
-The script builds the release executable, checks that the manifest embedded in
-it is the expected one, and writes three files to `dist`:
-
-- `Quboid-<version>-windows-x64.msi`: a per-user installer. It installs into
-  `%LOCALAPPDATA%\Quboid`, adds a Start Menu shortcut, upgrades an older version
-  in place and needs no administrator rights. Installing, upgrading or removing
-  it stops every running `quboid-app.exe`, a portable copy or a development
-  build included, because only one of them can own the global shortcuts; an
-  upgrade starts the new version again if Quboid was running before it;
-- `Quboid-<version>-windows-x64-portable.zip`: the executable, this README and
-  the licence, plus a `portable.flag` file. That flag is what makes Quboid keep
-  its configuration and logs next to the executable instead of under `%APPDATA%`,
-  so the archive can be unpacked onto a USB stick;
-- `SHA256SUMS.txt`: the checksums of both artifacts.
-
-WiX also leaves a `Quboid-<version>-windows-x64.wixpdb` next to them. It holds
-the debug symbols of the installer and is not part of a release.
-
-```powershell
-# Package what is already built, without compiling again.
-.\scripts\package.ps1 -Version 0.1.0 -SkipBuild
-
-# Use a WiX CLI that is not on PATH, or another one than the PATH provides.
-.\scripts\package.ps1 -Version 0.1.0 -WixPath $env:USERPROFILE\.dotnet\tools\wix.exe
-
-# Sign the executable and the installer with a certificate in your store.
-.\scripts\package.ps1 -Version 0.1.0 -CertificateThumbprint <thumbprint>
-```
-
-### The Store package
-
-```powershell
-.\scripts\package-msix.ps1
-```
-
-This writes `dist\Quboid-<version>-windows-x64.msix`, a full-trust packaged
-build for the Microsoft Store. The package is deliberately left unsigned: the
-Store re-signs submitted MSIX packages itself, and the `Publisher` in
-`packaging\msix\AppxManifest.xml` is the identifier Partner Center assigned to
-the reserved name rather than a certificate anyone holds.
-
-```powershell
-# Register the staged layout instead of packing it. The app then runs with
-# real package identity, which is the only way to exercise the packaged
-# behaviour, and it needs Developer Mode but no certificate and no admin.
-.\scripts\package-msix.ps1 -Register
-```
-
-Launch-at-login differs between the two builds. A packaged build has no say
-over the Run key, so it drives the `StartupTask` the manifest declares; every
-other build writes `HKCU\...\CurrentVersion\Run` as before. Both paths live
-behind `set_launch_at_login`.
-
-### Icons
-
-```powershell
-.\scripts\generate-icons.ps1
-```
-
-Every icon is drawn from one description, so the executable, the tray and the
-Store package cannot drift apart. The script writes `quboid.ico`, which
-`quboid.rc` embeds into the executable, and the scale- and target-size
-variants under `packaging\msix\assets`. Those variants are named for Windows
-to resolve, which it only does through the resource index `package-msix.ps1`
-builds with `makepri`; the index is what lets the manifest name
-`Square44x44Logo.png` even though no file has that exact name.
-
-Pass `-PreviewPath <file.png>` to render the mark at the sizes that decide
-whether it still reads, on both a light and a dark surface, without touching
-the assets.
-
-### Checking the artifacts
-
-```powershell
-.\scripts\test-packaging.ps1 -Version 0.1.0 -InstallSmoke
-```
-
-This verifies the checksums, the contents of the portable archive and the
-properties of the installer, and reads back the manifest embedded in the shipped
-executable. With `-InstallSmoke` it also installs the MSI silently, checks that
-the executable landed in `%LOCALAPPDATA%\Quboid` and uninstalls it again; it
-refuses to run that step when Quboid is already installed, so it never replaces
-your own installation. It does stop a Quboid you are running from a portable
-copy or from `cargo run`, as any install of the MSI does.
-
-`.\scripts\test-all.ps1` runs the whole chain: formatting, tests, lints, the
-release build, the Windows end-to-end test, packaging and these checks.
-
-### Releasing
-
-Pushing an `X.Y.Z` tag runs `.github\workflows\release.yml`, which refuses to go
-on unless the tag matches the version in `Cargo.toml`, then publishes the MSI,
-the portable archive and the checksums as a GitHub release and submits the MSIX
-to the Microsoft Store. Tags carry no `v` prefix, so the tag and the version in
-`Cargo.toml` are the same string.
-
-Every version needs a `## [X.Y.Z]` section in both [`CHANGELOG.md`](CHANGELOG.md)
-and [`CHANGELOG.it.md`](CHANGELOG.it.md), written for the people who use Quboid.
-The English and Italian sections become the notes of the GitHub release, and
-their plain-text form becomes the "What's new in this version" of the matching
-Store listing: listings in Italian get the Italian text, every other listing
-the English one. The Store caps that text at 1500 characters. CI checks both
-sections on every pull request and the release workflow checks them again
-before building, so a version bump without its changelog cannot be tagged:
-
-```powershell
-# Check the version in Cargo.toml, as CI does.
-.\scripts\release-notes.ps1 -Check
-
-# Preview what the Store listing will say.
-.\scripts\release-notes.ps1 -Language it -Format Store
-```
-
-To put the notes in, the Store job uploads the package into a draft
-submission, writes the notes into its listings with
-`scripts\set-store-release-notes.ps1`, and only then commits it.
-
-Running the workflow by hand from the Actions tab rehearses all of that without
-publishing anything: it builds, packages and verifies, and stops short of the
-release and the submission. Nothing creates a tag, so there is no way to spend a
-version by accident.
-
-`Cargo.toml` is the only place a version is written. The MSIX identity derives
-from it as `X.Y.Z.0`: the fourth part belongs to the Store and stays zero, which
-is why a prerelease tag such as `1.0.0-rc.1` produces a GitHub release but no
-Store submission. The Store also rejects a package that does not outrank the
-published one, so a submission that fails certification cannot be retried under
-the same version; the fix ships as a new patch release.
-
-The submission needs five repository secrets — `STORE_PRODUCT_ID`,
-`STORE_TENANT_ID`, `STORE_SELLER_ID`, `STORE_CLIENT_ID` and
-`STORE_CLIENT_SECRET` — obtained from Partner Center and a Microsoft Entra ID
-application holding the Manager role on the account. With none of them set the
-job reports a skip instead of failing, so a fork releases without them. Setting
-only some of them fails the release instead: a secret that exists but is empty
-counts as missing, which is the likeliest way to break a release that worked
-before. Partner Center still owns what no API can create: the reserved name, the
-listing and the first submission are done by hand once, and every tag after that
-ships on its own. Certification itself is asynchronous, so the job waits on the
-outcome and fails if Microsoft rejects the package.
-
-`STORE_CLIENT_SECRET` expires on the date chosen when it was created in Entra,
-and releases fail to authenticate from that day on. Issuing a new secret on the
-same application and updating the repository secret is the whole fix; nothing
-else needs to change.
-
-Releases are immutable, so deleting one does not free its tag name: the name is
-burned and that version can never be released again. A release published by
-mistake is superseded by the next patch rather than replaced.
-
-## License
-
-Copyright (C) 2026 Samuele Sormano.
-
-Quboid is free software, distributed under the GNU General Public License,
-version 3. See [`LICENSE`](LICENSE).
-
-You may use, study, modify and redistribute Quboid, including commercially. If
-you distribute it, modified or not, you must do so under the GPL and make the
-complete corresponding source available to whoever receives it.
-
-Contributions are accepted under the agreement described in
-[`CONTRIBUTING.md`](CONTRIBUTING.md), which also lets the author license the
-project under other terms.
+The [Microsoft Store](https://apps.microsoft.com/detail/9NJMQV24WD26?cid=readme) and `winget` (`--source msstore`) builds are signed by Microsoft and install without warnings. The standalone `.msi` and `.zip` on GitHub Releases are built directly from this repository by [`.github/workflows/release.yml`](.github/workflows/release.yml) with SHA-256 checksums, but they are not signed with a commercial Authenticode certificate yet, so SmartScreen warns on first run.
+</details>
 
 ## Privacy
 
-Quboid collects nothing and transmits nothing; it has no networking code at
-all. What it stores locally, and where, is described in
-[`PRIVACY.md`](PRIVACY.md).
+Quboid collects nothing and sends nothing. You don't have to take our word for it: the executable imports no networking library, and CI fails if a networking crate or DLL import ever appears.
+
+```powershell
+dumpbin /imports quboid-app.exe | Select-String -Pattern 'ws2_32|winhttp|wininet|mswsock|dnsapi|iphlpapi|urlmon'
+# prints nothing
+```
+
+What Quboid stores locally (`config.json` and a rolling local diagnostic log), and where, is documented in [`PRIVACY.md`](PRIVACY.md).
+
+## Community and contributing
+
+- **Questions and ideas:** [GitHub Discussions](https://github.com/SormanoS/quboid/discussions)
+- **Bug reports and feature requests:** [GitHub Issues](https://github.com/SormanoS/quboid/issues/new/choose)
+- **Display Lab:** share your multi-monitor / mixed-DPI setup via the [Display setup report](https://github.com/SormanoS/quboid/issues/new?template=display_setup.yml) to help grow [`docs/tested-setups.md`](docs/tested-setups.md)
+- **First contributions:** browse [`good first issue`](https://github.com/SormanoS/quboid/labels/good%20first%20issue) and [`help wanted`](https://github.com/SormanoS/quboid/labels/help%20wanted)
+
+If Quboid saves you time, a ⭐ on GitHub or a short review on the [Microsoft Store](https://apps.microsoft.com/detail/9NJMQV24WD26?cid=readme) helps other Windows users find it.
+
+## License and how Quboid is funded
+
+Copyright (C) 2026 Samuele Sormano.
+
+Quboid is free software, distributed under the **GNU General Public License, version 3** ([`LICENSE`](LICENSE)). You may use, study, modify and redistribute it under the terms of the GPL v3.
+
+To keep development sustainable while keeping this repository free, open source and telemetry-free forever, code contributions are accepted under the contributor agreement in [`CONTRIBUTING.md`](CONTRIBUTING.md), which also allows the author to offer commercial licenses or build paid extensions on top of the same core. Every version published from this repository remains GPL v3. Opening issues, reporting bugs, sharing display setups and participating in discussions require no agreement.
+
+## Documentation and trust
+
+- **Developer docs:** [Building and architecture (`docs/BUILDING.md`)](docs/BUILDING.md) · [Releasing (`docs/RELEASING.md`)](docs/RELEASING.md) · [Tested monitor setups (`docs/tested-setups.md`)](docs/tested-setups.md)
+- **Trust:** [`LICENSE`](LICENSE) · [`PRIVACY.md`](PRIVACY.md) · [`SECURITY.md`](SECURITY.md) · [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
+

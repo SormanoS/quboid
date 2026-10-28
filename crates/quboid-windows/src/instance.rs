@@ -86,7 +86,11 @@ impl Drop for SingleInstance {
 /// looking for the settings window, so handing them the one that exists is the
 /// whole point of stopping the second instance.
 pub fn show_running_instance() -> bool {
-    let title = HSTRING::from(SIGNAL_WINDOW_TITLE);
+    show_running_instance_with_title(SIGNAL_WINDOW_TITLE)
+}
+
+fn show_running_instance_with_title(window_title: &str) -> bool {
+    let title = HSTRING::from(window_title);
     let Ok(hwnd) = (unsafe { FindWindowExW(Some(HWND_MESSAGE), None, w!("STATIC"), &title) })
     else {
         return false;
@@ -120,11 +124,15 @@ pub(crate) struct SignalWindow {
 
 impl SignalWindow {
     pub(crate) fn new() -> Option<Self> {
+        Self::with_title(SIGNAL_WINDOW_TITLE)
+    }
+
+    fn with_title(window_title: &str) -> Option<Self> {
         use windows::Win32::UI::WindowsAndMessaging::{
             CreateWindowExW, WINDOW_EX_STYLE, WINDOW_STYLE,
         };
 
-        let title = HSTRING::from(SIGNAL_WINDOW_TITLE);
+        let title = HSTRING::from(window_title);
         let hwnd = unsafe {
             CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -190,7 +198,7 @@ mod tests {
     #[serial]
     fn a_launch_with_nobody_listening_is_reported_as_such() {
         assert!(
-            !show_running_instance(),
+            !show_running_instance_with_title("Quboid test message sink — nobody listening"),
             "no signal window exists in this test process yet"
         );
     }
@@ -198,9 +206,14 @@ mod tests {
     #[test]
     #[serial]
     fn the_running_instance_hears_the_launch_that_was_handed_to_it() {
-        let _window = SignalWindow::new().expect("the message-only window could be created");
+        const TEST_SINK: &str = "Quboid test message sink — listening";
+        let _window =
+            SignalWindow::with_title(TEST_SINK).expect("the message-only window could be created");
 
-        assert!(show_running_instance(), "the window should have been found");
+        assert!(
+            show_running_instance_with_title(TEST_SINK),
+            "the window should have been found"
+        );
 
         // The message is posted to a window this thread owns, so it lands in
         // this thread's queue, which is where the runtime loop reads it.
