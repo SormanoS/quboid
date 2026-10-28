@@ -489,7 +489,7 @@ impl UiState {
         let unavailable = self.unavailable_shortcuts.clone();
         let welcome = self.welcome;
         let mut close = false;
-        let modal = egui::Modal::new(egui::Id::new("cheat-sheet")).show(ui.ctx(), |ui| {
+        let modal = egui::Modal::new(egui::Id::unique("cheat-sheet")).show(ui.ctx(), |ui| {
             let palette = Palette::of(ui);
             ui.set_width(620.0);
             ui.label(
@@ -728,18 +728,20 @@ impl UiState {
             ui.group(|ui| {
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    egui::ComboBox::from_id_salt("new-shortcut-action")
-                        .width(190.0)
-                        .selected_text(action_name(language, action))
-                        .show_ui(ui, |ui| {
-                            for candidate in Action::ALL {
-                                ui.selectable_value(
-                                    &mut action,
-                                    candidate,
-                                    action_name(language, candidate),
-                                );
-                            }
-                        });
+                    ui.name_inputs(text(language, "Azione", "Action"), |ui| {
+                        egui::ComboBox::from_id_salt("new-shortcut-action")
+                            .width(190.0)
+                            .selected_text(action_name(language, action))
+                            .show_ui(ui, |ui| {
+                                for candidate in Action::ALL {
+                                    ui.selectable_value(
+                                        &mut action,
+                                        candidate,
+                                        action_name(language, candidate),
+                                    );
+                                }
+                            });
+                    });
                     ui.label(text(
                         language,
                         "Premi la combinazione desiderata…",
@@ -798,23 +800,30 @@ impl UiState {
                                         ui.set_min_width(ui.available_width());
                                         ui.horizontal(|ui| {
                                             let binding = &mut self.config.hotkeys[index];
-                                            egui::ComboBox::from_id_salt(("action", index))
-                                                .width(170.0)
-                                                .selected_text(action_name(
-                                                    language,
-                                                    binding.action,
-                                                ))
-                                                .show_ui(ui, |ui| {
-                                                    for action in Action::ALL {
-                                                        changed |= ui
-                                                            .selectable_value(
-                                                                &mut binding.action,
-                                                                action,
-                                                                action_name(language, action),
-                                                            )
-                                                            .changed();
-                                                    }
-                                                });
+                                            ui.name_inputs(
+                                                text(language, "Azione", "Action"),
+                                                |ui| {
+                                                    egui::ComboBox::from_id_salt(("action", index))
+                                                        .width(170.0)
+                                                        .selected_text(action_name(
+                                                            language,
+                                                            binding.action,
+                                                        ))
+                                                        .show_ui(ui, |ui| {
+                                                            for action in Action::ALL {
+                                                                changed |= ui
+                                                                    .selectable_value(
+                                                                        &mut binding.action,
+                                                                        action,
+                                                                        action_name(
+                                                                            language, action,
+                                                                        ),
+                                                                    )
+                                                                    .changed();
+                                                            }
+                                                        });
+                                                },
+                                            );
                                             let capture_active = self.shortcut_capture
                                                 == Some(ShortcutCapture::Existing(index));
                                             let is_unavailable = self
@@ -992,28 +1001,30 @@ impl UiState {
                 .num_columns(2)
                 .spacing([24.0, 14.0])
                 .show(ui, |ui| {
-                    ui.label(text(language, "Lingua", "Language"));
-                    egui::ComboBox::from_id_salt("language")
-                        .selected_text(match self.config.language {
-                            Language::Italian => "Italiano",
-                            Language::English => "English",
-                        })
-                        .show_ui(ui, |ui| {
-                            changed |= ui
-                                .selectable_value(
-                                    &mut self.config.language,
-                                    Language::Italian,
-                                    "Italiano",
-                                )
-                                .changed();
-                            changed |= ui
-                                .selectable_value(
-                                    &mut self.config.language,
-                                    Language::English,
-                                    "English",
-                                )
-                                .changed();
-                        });
+                    let language_label = ui.label(text(language, "Lingua", "Language"));
+                    ui.label_inputs_by(language_label.id, |ui| {
+                        egui::ComboBox::from_id_salt("language")
+                            .selected_text(match self.config.language {
+                                Language::Italian => "Italiano",
+                                Language::English => "English",
+                            })
+                            .show_ui(ui, |ui| {
+                                changed |= ui
+                                    .selectable_value(
+                                        &mut self.config.language,
+                                        Language::Italian,
+                                        "Italiano",
+                                    )
+                                    .changed();
+                                changed |= ui
+                                    .selectable_value(
+                                        &mut self.config.language,
+                                        Language::English,
+                                        "English",
+                                    )
+                                    .changed();
+                            });
+                    });
                     ui.end_row();
 
                     ui.label(text(language, "Snap trascinando", "Drag snapping"));
@@ -1025,16 +1036,20 @@ impl UiState {
                         .changed();
                     ui.end_row();
 
-                    ui.label(text(language, "Gap", "Gap"));
-                    changed |= setting_slider(ui, &mut self.config.gap, 0..=MAX_GAP, " px");
+                    let gap_label = ui.label(text(language, "Gap", "Gap"));
+                    ui.label_inputs_by(gap_label.id, |ui| {
+                        changed |= setting_slider(ui, &mut self.config.gap, 0..=MAX_GAP, " px");
+                    });
                     ui.end_row();
 
-                    ui.label(text(language, "Soglia snap", "Snap threshold"));
+                    let threshold_label = ui.label(text(language, "Soglia snap", "Snap threshold"));
                     let mut snap_percent = ((self.config.snap_threshold + 50) / 100).clamp(1, 15);
-                    if setting_slider(ui, &mut snap_percent, 1..=15, "%") {
-                        self.config.snap_threshold = snap_percent * 100;
-                        changed = true;
-                    }
+                    ui.label_inputs_by(threshold_label.id, |ui| {
+                        if setting_slider(ui, &mut snap_percent, 1..=15, "%") {
+                            self.config.snap_threshold = snap_percent * 100;
+                            changed = true;
+                        }
+                    });
                     ui.end_row();
 
                     ui.label(text(language, "Cambio schermo", "Display change"));
@@ -1116,9 +1131,7 @@ fn scrollable<R>(ui: &mut Ui, id: &str, add_contents: impl FnOnce(&mut Ui) -> R)
 fn navigation_item(ui: &mut Ui, icon: PageIcon, selected: bool, label: &str) -> egui::Response {
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), 40.0), Sense::click());
-    response.widget_info(|| {
-        egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label)
-    });
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label));
 
     let palette = Palette::of(ui);
     let fill = if selected {
@@ -1520,11 +1533,39 @@ fn virtual_key_for(key: Key) -> Option<u32> {
         Key::F22 => 0x85,
         Key::F23 => 0x86,
         Key::F24 => 0x87,
+        Key::Pause => 0x13,
+        Key::CapsLock => 0x14,
+        Key::PrintScreen => 0x2C,
+        Key::NumLock => 0x90,
+        Key::ScrollLock => 0x91,
         Key::BrowserBack => 0xA6,
+        Key::BrowserForward => 0xA7,
+        Key::AudioVolumeMute => 0xAD,
+        Key::AudioVolumeDown => 0xAE,
+        Key::AudioVolumeUp => 0xAF,
+        Key::MediaTrackNext => 0xB0,
+        Key::MediaTrackPrevious => 0xB1,
+        Key::MediaStop => 0xB2,
+        Key::MediaPlayPause => 0xB3,
         Key::IntlBackslash => 0xE2,
         Key::Copy
         | Key::Cut
         | Key::Paste
+        | Key::BrowserRefresh
+        | Key::BrowserSearch
+        | Key::BrowserHome
+        | Key::BrowserFavorites
+        | Key::BrowserStop
+        | Key::LaunchMail
+        | Key::LaunchApp1
+        | Key::LaunchApp2
+        | Key::Menu
+        | Key::Fn
+        | Key::Eject
+        | Key::Help
+        | Key::Power
+        | Key::Sleep
+        | Key::Clear
         | Key::F25
         | Key::F26
         | Key::F27
@@ -1556,8 +1597,7 @@ fn action_card(
 ) -> egui::Response {
     let name = action_name(language, action);
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 82.0), Sense::click());
-    response
-        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), name));
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), name));
     let palette = Palette::of(ui);
     let (fill, border) = if response.is_pointer_button_down_on() {
         (palette.brand_soft, palette.brand_fill)
@@ -1907,7 +1947,7 @@ mod tests {
         // A plain background layer: no shadow and no fade-in to read through.
         let mut ui = egui::Ui::new(
             ctx.clone(),
-            egui::Id::new("slider-under-test"),
+            egui::Id::unique("slider-under-test"),
             egui::UiBuilder::new().max_rect(egui::Rect::from_min_size(
                 egui::Pos2::ZERO,
                 egui::vec2(600.0, 200.0),
