@@ -2182,7 +2182,7 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "quboid-app"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "crossbeam-channel",
  "eframe",
@@ -2200,7 +2200,7 @@ dependencies = [
 
 [[package]]
 name = "quboid-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "proptest",
  "serde",
@@ -2211,7 +2211,7 @@ dependencies = [
 
 [[package]]
 name = "quboid-ui"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "egui",
  "egui_kittest",
@@ -2220,7 +2220,7 @@ dependencies = [
 
 [[package]]
 name = "quboid-windows"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "crossbeam-channel",
  "quboid-core",

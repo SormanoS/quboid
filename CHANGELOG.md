@@ -9,6 +9,23 @@ of the GitHub release and the "What's new in this version" text of the
 Microsoft Store listing, which accepts plain text only: write short bullets,
 avoid tables and images, and keep each section under 1500 characters.
 
+## [1.0.1] - 2026-10-28
+
+### Added
+
+- On first launch, Quboid now opens the settings window with the shortcut sheet
+  so you can see every shortcut right away and know where to find it in the
+  notification area (`Ctrl+Alt+S`).
+- Screen-reader labels for dropdowns and sliders in the settings window, and
+  shortcut capture support for media, browser navigation and lock keys.
+
+### Fixed
+
+- The default `Restore` shortcut is now `Ctrl+Alt+Backspace` (matching
+  Rectangle on macOS) instead of `Ctrl+Alt+Delete`, which Windows reserves for
+  the system security screen and always reported as already in use. Existing
+  configurations with the old default are updated automatically.
+
 ## [1.0.0] - 2026-10-19
 
 ### Added
