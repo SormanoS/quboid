@@ -24,13 +24,15 @@ before building, so a version bump without its changelog cannot be tagged:
 ```
 
 To put the notes in, the Store job uploads the package into a draft
-submission, writes the notes into its listings with
-`scripts\set-store-release-notes.ps1`, and only then commits it.
+submission, writes the release notes and the English/Italian listing copy
+(`shortDescription`, `description`, `features` and `keywords`) into its
+listings with `scripts\set-store-release-notes.ps1`, and only then commits it.
 
 Running the workflow by hand from the Actions tab rehearses all of that without
 publishing anything: it builds, packages and verifies, and stops short of the
-release and the submission. Nothing creates a tag, so there is no way to spend a
-version by accident.
+release and the submission (unless `update_store_listing` is checked to refresh
+the Store listing copy without uploading a new MSIX). Nothing creates a tag, so
+there is no way to spend a version by accident.
 
 `Cargo.toml` is the only place a version is written. The MSIX identity derives
 from it as `X.Y.Z.0`: the fourth part belongs to the Store and stays zero, which

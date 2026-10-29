@@ -12,9 +12,17 @@ on:
       version:
         description: >-
           The version to rehearse, matching Cargo.toml. A manual run builds,
-          packages and verifies everything but publishes nothing, so the
-          pipeline can be exercised without spending a version.
+          packages and verifies everything but publishes nothing, unless
+          update_store_listing is enabled.
         required: true
+      update_store_listing:
+        description: >-
+          Update the Microsoft Store listing text (short description,
+          description, features, keywords and release notes) without uploading
+          a new MSIX package.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,6 +37,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       store: ${{ steps.version.outputs.store }}
+      store_package: ${{ steps.version.outputs.store_package }}
     steps:
       - uses: actions/checkout@v7
 
@@ -70,10 +79,14 @@ jobs:
           # An MSIX identity is major.minor.patch.0, so a prerelease version has
           # no package the Store would accept. Such a tag still produces a
           # GitHub release; it just stops before the Store. A manual run
-          # publishes nothing at all, since it has no tag to release against.
+          # uploads no package, since the Store refuses a duplicate version,
+          # but can still refresh the Store listing metadata when requested.
           $Tagged = "${{ github.event_name }}" -eq "push"
-          $Store = if ($Tagged -and $Manifested -match '^\d+\.\d+\.\d+$') { "true" } else { "false" }
+          $StorePackage = $Tagged -and ($Manifested -match '^\d+\.\d+\.\d+$')
+          $UpdateListing = ("${{ github.event_name }}" -eq "workflow_dispatch") -and ("${{ inputs.update_store_listing }}" -eq "true") -and ($Manifested -match '^\d+\.\d+\.\d+$')
+          $Store = if ($StorePackage -or $UpdateListing) { "true" } else { "false" }
           "store=$Store" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+          "store_package=$($StorePackage.ToString().ToLower())" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
           "tagged=$($Tagged.ToString().ToLower())" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
 
       # The changelogs are what the GitHub release and the Store listing say
@@ -97,13 +110,14 @@ jobs:
       # The MSIX is unsigned because the Store signs what it accepts, so it is
       # kept out of the GitHub release and handed to the store job instead.
       - name: Package the MSIX
-        if: steps.version.outputs.store == 'true'
+        if: steps.version.outputs.store_package == 'true'
         run: .\scripts\package-msix.ps1 -Version ${{ steps.version.outputs.version }} -SkipBuild
 
       # The Store listing takes plain text, one text per language.
       - name: Write the Store release notes
         if: steps.version.outputs.store == 'true'
         run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
           foreach ($Language in "en", "it") {
               .\scripts\release-notes.ps1 `
                 -Version ${{ steps.version.outputs.version }} `
@@ -112,7 +126,7 @@ jobs:
                 -OutFile "dist/store-notes.$Language.txt"
           }
 
-      - name: Upload the MSIX
+      - name: Upload the Store submission inputs
         if: steps.version.outputs.store == 'true'
         uses: actions/upload-artifact@v7
         with:
@@ -237,7 +251,7 @@ jobs:
       # This uploads the package into a draft and stops there, so the draft
       # can take the release notes before it is committed.
       - name: Upload the MSIX
-        if: steps.credentials.outputs.configured == 'true'
+        if: steps.credentials.outputs.configured == 'true' && needs.release.outputs.store_package == 'true'
         env:
           VERSION: ${{ needs.release.outputs.version }}
         run: |
@@ -247,9 +261,10 @@ jobs:
           }
 
       # "What's new in this version" comes from the changelogs, in the
-      # language of each listing. Every other field of the draft goes back to
-      # Partner Center untouched.
-      - name: Write the release notes into the listings
+      # language of each listing, together with the listing copy in
+      # scripts/set-store-release-notes.ps1. Every other field of the draft
+      # goes back to Partner Center untouched.
+      - name: Write the listing copy and release notes into the listings
         if: steps.credentials.outputs.configured == 'true'
         run: |
           msstore submission get ${{ secrets.STORE_PRODUCT_ID }} > dist/submission.txt

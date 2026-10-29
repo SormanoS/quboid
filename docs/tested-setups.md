@@ -7,3 +7,4 @@ Because Quboid collects no telemetry, this table is maintained from community re
 | Windows | Displays & Arrangement | Scaling (DPI) | Dock / Connection | Restore after Dock/Undock | Reported by |
 | --- | --- | --- | --- | --- | --- |
 | Windows 11 | Laptop + external display | Mixed DPI | USB-C / HDMI | Verified | [@SormanoS](https://github.com/SormanoS) |
+| Windows 11 | 3840×1080 (32:9 super-ultrawide) | 100% | DisplayPort / HDMI | Verified | [@SormanoS](https://github.com/SormanoS) |
