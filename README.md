@@ -7,6 +7,8 @@
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![No network code](https://img.shields.io/badge/network%20code-none-success)](#privacy)
 
+![Quboid snapping windows into thirds and two-thirds on an ultrawide display](docs/assets/hero.gif)
+
 ## Quick start
 
 ```powershell
