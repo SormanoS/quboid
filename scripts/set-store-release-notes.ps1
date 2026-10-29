@@ -60,11 +60,8 @@ function Set-JsonStringArrayProperty {
             break
         }
     }
-    $Array = New-Object System.Text.Json.Nodes.JsonArray
-    foreach ($Item in $Values) {
-        $null = $Array.Add([System.Text.Json.Nodes.JsonValue]::Create([string]$Item))
-    }
-    $Object[$Key] = $Array
+    $Json = ConvertTo-Json -InputObject @($Values) -Compress
+    $Object[$Key] = [System.Text.Json.Nodes.JsonNode]::Parse($Json)
 }
 
 $ListingCopy = @{
